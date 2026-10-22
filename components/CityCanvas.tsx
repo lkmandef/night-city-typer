@@ -10,9 +10,9 @@ import {
   isItemVisible,
   updateCamera,
 } from "@/lib/city/camera";
-import { drawGround, drawSky } from "@/lib/render/sky";
-import { drawBuildings } from "@/lib/render/drawBuilding";
-import { drawSeparators } from "@/lib/render/separators";
+import { generateStars } from "@/lib/render/stars";
+import { createParallaxRenderer } from "@/lib/render/parallax";
+import { renderScene } from "@/lib/render/pipeline";
 import HiddenInput from "@/components/HiddenInput";
 
 function subscribeToLocation(callback: () => void) {
@@ -32,6 +32,9 @@ export default function CityCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sizeRef = useRef({ width: 0, height: 0, dpr: 1 });
   const cityStateRef = useRef<CityState>(createInitialCityState());
+  const starsRef = useRef(generateStars(140, 8888));
+  const parallaxRef = useRef(createParallaxRenderer());
+
   const [debugAction, setDebugAction] = useState<string | null>(null);
   const [focusDebugInfo, setFocusDebugInfo] = useState<string>("Belum ada event fokus");
   const [buildingCount, setBuildingCount] = useState<number>(0);
@@ -137,6 +140,9 @@ export default function CityCanvas() {
 
       sizeRef.current = { width, height, dpr };
 
+      const groundY = height * 0.85;
+      parallaxRef.current.setup(groundY);
+
       const worldScale = computeWorldScale(width);
       const worldScreenWidth = width / worldScale;
 
@@ -178,40 +184,40 @@ export default function CityCanvas() {
 
         ctx.clearRect(0, 0, width, height);
 
-        // Langit dan dasar tanah digambar di koordinat layar (statis)
-        drawSky(ctx, width, height);
-        drawGround(ctx, width, height);
-
-        // 3. Terapkan skala dunia responsif dan translasi kamera pada objek dunia
-        ctx.save();
-        ctx.translate(0, groundY);
-        ctx.scale(worldScale, worldScale);
-        ctx.translate(-cameraX, -groundY);
-
-        // Culling: hanya gambar pemisah yang terlihat di area kamera
+        // Culling: hanya gambar pemisah dan gedung yang terlihat di area kamera
         const allSeparators = cityStateRef.current.items.filter(
           (item): item is Separator => "progress" in item
         );
         const visibleSeparators = allSeparators.filter((s) =>
           isItemVisible(s.x, s.width, cameraX, worldScreenWidth)
         );
-        drawSeparators(ctx, visibleSeparators, groundY, currentTime);
 
-        // Culling: hanya gambar gedung yang terlihat di area kamera
         const allBuildings = cityStateRef.current.items.filter(
           (item): item is Building => "windows" in item
         );
         const visibleBuildings = allBuildings.filter((b) =>
           isItemVisible(b.x, b.width, cameraX, worldScreenWidth)
         );
-        drawBuildings(ctx, visibleBuildings, groundY, currentTime);
 
-        ctx.restore();
+        // 3. Render pemandangan lengkap melalui pipeline
+        renderScene({
+          ctx,
+          width,
+          height,
+          groundY,
+          worldScale,
+          cameraX,
+          stars: starsRef.current,
+          parallax: parallaxRef.current,
+          visibleSeparators,
+          visibleBuildings,
+          time: currentTime,
+        });
 
         // Debug info update
         if (isDebug && Math.floor(currentTime) % 10 === 0) {
           setCameraDebugInfo(
-            `Cam: ${Math.round(cameraX)} | Target: ${Math.round(targetX)} | Skala: ${worldScale.toFixed(2)} | Visible: ${visibleBuildings.length}/${allBuildings.length}`
+            `Cam: ${Math.round(cameraX)} | Skala: ${worldScale.toFixed(2)} | Vis: ${visibleBuildings.length}/${allBuildings.length}`
           );
         }
       }

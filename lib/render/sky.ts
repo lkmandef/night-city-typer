@@ -1,5 +1,5 @@
 /**
- * Menggambar langit malam dan garis horizon.
+ * Menggambar langit malam, bulan, dan garis horizon.
  */
 
 export function drawSky(ctx: CanvasRenderingContext2D, width: number, height: number): void {
@@ -14,6 +14,51 @@ export function drawSky(ctx: CanvasRenderingContext2D, width: number, height: nu
 
   ctx.fillStyle = skyGradient;
   ctx.fillRect(0, 0, width, groundY);
+}
+
+/**
+ * Menggambar bulan lembut di sudut kanan atas dengan pendaran radial.
+ */
+export function drawMoon(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  time: number
+): void {
+  const moonX = width * 0.82 - ((time * 0.0015) % 30);
+  const moonY = height * 0.2;
+  const radius = Math.max(14, Math.min(24, Math.round(width * 0.022)));
+
+  // 1. Glow radial lembut
+  const glow = ctx.createRadialGradient(
+    moonX,
+    moonY,
+    radius * 0.5,
+    moonX,
+    moonY,
+    radius * 3.2
+  );
+  glow.addColorStop(0, "rgba(255, 245, 220, 0.32)");
+  glow.addColorStop(0.35, "rgba(255, 230, 190, 0.1)");
+  glow.addColorStop(1, "rgba(255, 230, 190, 0)");
+
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(moonX, moonY, radius * 3.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Lingkaran piringan bulan krem pucat
+  ctx.fillStyle = "#fff8ea";
+  ctx.beginPath();
+  ctx.arc(moonX, moonY, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 3. Tekstur kawah halus
+  ctx.fillStyle = "rgba(225, 218, 200, 0.35)";
+  ctx.beginPath();
+  ctx.arc(moonX - radius * 0.22, moonY - radius * 0.08, radius * 0.26, 0, Math.PI * 2);
+  ctx.arc(moonX + radius * 0.3, moonY + radius * 0.2, radius * 0.18, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 export function drawGround(ctx: CanvasRenderingContext2D, width: number, height: number): void {

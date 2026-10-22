@@ -28,6 +28,16 @@ export function drawBuilding(
   const drawX = building.x + jitterX;
   const topY = groundY - currentHeight;
 
+  // Jika gedung berstatus siluet (melewati batas 200 item), gambar siluet sederhana tanpa jendela
+  if (building.isSilhouette) {
+    ctx.fillStyle = "#0c1020";
+    ctx.fillRect(drawX, topY, building.width, currentHeight);
+    ctx.strokeStyle = "rgba(35, 45, 75, 0.5)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(drawX, topY, building.width, currentHeight);
+    return;
+  }
+
   // 1. Glow halus per gedung (satu radial gradient overlay, efisien tanpa shadowBlur)
   const hasLitWindows = building.windows.some((w) => w.lit);
   if (hasLitWindows && currentHeight > 10) {

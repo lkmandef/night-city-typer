@@ -4,6 +4,12 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import type { Building, CityAction, CityState, Separator } from "@/lib/city/types";
 import { cityReducer, createInitialCityState } from "@/lib/city/reducer";
 import { updateCity } from "@/lib/city/buildings";
+import {
+  computeCameraTarget,
+  computeWorldScale,
+  isItemVisible,
+  updateCamera,
+} from "@/lib/city/camera";
 import { drawGround, drawSky } from "@/lib/render/sky";
 import { drawBuildings } from "@/lib/render/drawBuilding";
 import { drawSeparators } from "@/lib/render/separators";
@@ -29,6 +35,7 @@ export default function CityCanvas() {
   const [debugAction, setDebugAction] = useState<string | null>(null);
   const [focusDebugInfo, setFocusDebugInfo] = useState<string>("Belum ada event fokus");
   const [buildingCount, setBuildingCount] = useState<number>(0);
+  const [cameraDebugInfo, setCameraDebugInfo] = useState<string>("");
 
   // Langganan ke URL query ?debug=1 menggunakan useSyncExternalStore
   const isDebug = useSyncExternalStore(
@@ -104,7 +111,7 @@ export default function CityCanvas() {
     };
   }, [handleAction]);
 
-  // Setup canvas dan game loop
+  // Setup canvas, game loop, kamera, dan skala dunia responsif
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -130,9 +137,17 @@ export default function CityCanvas() {
 
       sizeRef.current = { width, height, dpr };
 
-      // Set titik awal cursorX jika kota masih kosong
+      const worldScale = computeWorldScale(width);
+      const worldScreenWidth = width / worldScale;
+
+      // Set titik awal kota (sekitar 15% lebar layar) jika kota masih kosong
       if (cityStateRef.current.items.length === 0) {
-        cityStateRef.current.cursorX = Math.max(40, Math.round(width * 0.1));
+        cityStateRef.current.cursorX = Math.round(worldScreenWidth * 0.15);
+      } else {
+        // Hitung ulang target kamera saat resize tanpa menghapus kota
+        const targetX = computeCameraTarget(cityStateRef.current.cursorX, worldScreenWidth);
+        cityStateRef.current.cameraTarget = targetX;
+        cityStateRef.current.cameraX = targetX;
       }
     };
 
@@ -141,31 +156,64 @@ export default function CityCanvas() {
       lastTime = currentTime;
 
       const { width, height } = sizeRef.current;
-      const initialX = Math.max(40, Math.round(width * 0.1));
+      const worldScale = computeWorldScale(width);
+      const worldScreenWidth = width > 0 ? width / worldScale : 1;
+
+      // 1. Update target dan lerp kamera mengikuti gedung terbaru
+      const targetX = computeCameraTarget(cityStateRef.current.cursorX, worldScreenWidth);
+      cityStateRef.current.cameraTarget = targetX;
+      cityStateRef.current.cameraX = updateCamera(
+        cityStateRef.current.cameraX,
+        targetX,
+        dt
+      );
+
+      // 2. Update animasi tumbuh, jendela, pemisah, dan penghapusan item runtuh
+      const initialX = Math.round(worldScreenWidth * 0.15);
       updateCity(cityStateRef.current, dt, initialX);
 
       if (width > 0 && height > 0) {
         const groundY = height * 0.85;
+        const cameraX = cityStateRef.current.cameraX;
 
         ctx.clearRect(0, 0, width, height);
 
-        // 1. Gambar latar langit
+        // Langit dan dasar tanah digambar di koordinat layar (statis)
         drawSky(ctx, width, height);
-
-        // 2. Gambar dasar tanah
         drawGround(ctx, width, height);
 
-        // 3. Gambar pemisah (jalan, sungai, taman)
-        const separators = cityStateRef.current.items.filter(
+        // 3. Terapkan skala dunia responsif dan translasi kamera pada objek dunia
+        ctx.save();
+        ctx.translate(0, groundY);
+        ctx.scale(worldScale, worldScale);
+        ctx.translate(-cameraX, -groundY);
+
+        // Culling: hanya gambar pemisah yang terlihat di area kamera
+        const allSeparators = cityStateRef.current.items.filter(
           (item): item is Separator => "progress" in item
         );
-        drawSeparators(ctx, separators, groundY, currentTime);
+        const visibleSeparators = allSeparators.filter((s) =>
+          isItemVisible(s.x, s.width, cameraX, worldScreenWidth)
+        );
+        drawSeparators(ctx, visibleSeparators, groundY, currentTime);
 
-        // 4. Gambar gedung
-        const buildings = cityStateRef.current.items.filter(
+        // Culling: hanya gambar gedung yang terlihat di area kamera
+        const allBuildings = cityStateRef.current.items.filter(
           (item): item is Building => "windows" in item
         );
-        drawBuildings(ctx, buildings, groundY, currentTime);
+        const visibleBuildings = allBuildings.filter((b) =>
+          isItemVisible(b.x, b.width, cameraX, worldScreenWidth)
+        );
+        drawBuildings(ctx, visibleBuildings, groundY, currentTime);
+
+        ctx.restore();
+
+        // Debug info update
+        if (isDebug && Math.floor(currentTime) % 10 === 0) {
+          setCameraDebugInfo(
+            `Cam: ${Math.round(cameraX)} | Target: ${Math.round(targetX)} | Skala: ${worldScale.toFixed(2)} | Visible: ${visibleBuildings.length}/${allBuildings.length}`
+          );
+        }
       }
 
       rafId = requestAnimationFrame(loop);
@@ -179,7 +227,7 @@ export default function CityCanvas() {
       cancelAnimationFrame(rafId);
       window.removeEventListener("resize", handleResize);
     };
-  }, []);
+  }, [isDebug]);
 
   return (
     <>
@@ -194,6 +242,7 @@ export default function CityCanvas() {
           <div>Aksi: {debugAction || "(belum ada)"}</div>
           <div>Fokus: {focusDebugInfo}</div>
           <div>Gedung: {buildingCount}</div>
+          <div>{cameraDebugInfo || "Memuat info kamera..."}</div>
           <div>
             ActiveElement:{" "}
             {typeof document !== "undefined"

@@ -1,5 +1,6 @@
 import type { Building, BuildingKind, BuildingWindow, CityState, Separator } from "./types";
 import { mulberry32 } from "./rng";
+import { applySilhouetteCap } from "./camera";
 
 /**
  * Menentukan tipe bangunan berdasarkan karakter:
@@ -168,6 +169,9 @@ export function updateCity(state: CityState, dt: number, initialCursorX = 60): v
       updateSeparator(item, dt);
     }
   }
+
+  // Batasi item aktif maksimal 200, sisanya dipadatkan jadi siluet
+  applySilhouetteCap(state.items, 200);
 
   // Hapus item dari ujung kanan jika sudah selesai runtuh
   let removedAny = false;

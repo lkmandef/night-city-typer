@@ -35,6 +35,7 @@ export interface Building {
   collapse: number;
   lightTimer?: number;
   collapseTimer?: number;
+  isSilhouette?: boolean;
 }
 
 export type SeparatorKind = "road" | "river" | "park";

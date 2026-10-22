@@ -19,5 +19,6 @@ Tugas:
 9. Tes Vitest: makeBuilding dengan input sama menghasilkan output sama; vokal menghasilkan tower; angka menghasilkan house; reducer menambah 1 item untuk 1 karakter.
 
 Batasan: belum ada spasi/backspace, kamera, atau bintang. Logika di lib/city tidak boleh mengimpor React/canvas.
+Catatan Tambahan: Setiap gedung menampilkan karakter yang diketik via font piksel 5x7 pada zona jendela atas (FR-15).
 
-Selesai jika: mengetik kata "halo" menumbuhkan 4 gedung berbeda dengan jendela yang menyala bertahap, dan semua tes lolos.
+Selesai jika: mengetik kata "halo" menumbuhkan 4 gedung berbeda dengan jendela yang menyala bertahap dan huruf terbaca pada fasadnya, dan semua tes lolos.

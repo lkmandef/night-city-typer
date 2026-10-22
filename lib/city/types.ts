@@ -18,6 +18,7 @@ export interface BuildingWindow {
   lit: boolean;
   litAt: number;
   hue: "warm" | "cool";
+  isLetter?: boolean;
 }
 
 export type Window = BuildingWindow;
@@ -35,7 +36,9 @@ export interface Building {
   collapse: number;
   lightTimer?: number;
   collapseTimer?: number;
+  letterTimer?: number;
   isSilhouette?: boolean;
+  glyph?: string[];
 }
 
 export type SeparatorKind = "road" | "river" | "park";

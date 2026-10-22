@@ -72,6 +72,7 @@ Portofolio developer sering berisi project yang mirip (to-do list, e-commerce, d
 | FR-12 | Efek tambahan: kendaraan lewat, kereta, kembang api saat kata selesai | Could |
 | FR-13 | Suara ambient dan bunyi ketik halus (bisa dimatikan) | Could |
 | FR-14 | Dukungan prefers-reduced-motion | Should |
+| FR-15 | Huruf yang diketik harus terbaca pada fasad gedungnya | Must |
 
 ### 2.7 Non-Functional Requirements
 
@@ -123,6 +124,8 @@ Portofolio developer sering berisi project yang mirip (to-do list, e-commerce, d
 | Huruf kapital | Gedung 1,3x lebih tinggi dengan penanda atap |
 
 Bentuk akhir ditentukan oleh **seed** dari kombinasi karakter dan urutannya, sehingga kata yang sama selalu menghasilkan kota yang sama. Ini membuat hasilnya bisa dibagikan dan mudah diuji.
+
+Selain tipe gedung di atas, setiap karakter yang diketik ditampilkan secara terbaca pada fasad gedung melalui font piksel 5x7 yang dibentuk oleh jendela yang menyala hangat. Jendela di sekitar zona huruf dipadamkan agar teks kontras dan terbaca jelas baik di desktop maupun mobile.
 
 ### 3.3 Palet Warna (contoh)
 

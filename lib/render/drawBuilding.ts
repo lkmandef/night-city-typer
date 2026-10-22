@@ -113,13 +113,16 @@ export function drawBuilding(
     const cols = building.windows.reduce((max, w) => Math.max(max, w.col + 1), 1);
     const rows = building.windows.reduce((max, w) => Math.max(max, w.row + 1), 1);
 
-    const padX = 6;
-    const padY = 8;
+    const hasGlyph = Boolean(building.glyph);
+    const padX = hasGlyph ? 5 : 6;
+    const padY = hasGlyph ? 6 : 8;
     const availW = building.width - padX * 2;
     const availH = building.height - padY * 2;
 
-    const winW = Math.max(2.5, Math.floor((availW - (cols - 1) * 3) / cols));
-    const winH = Math.max(3.5, Math.floor((availH - (rows - 1) * 4) / rows));
+    const minW = hasGlyph ? 3.5 : 2.5;
+    const minH = hasGlyph ? 4.5 : 3.5;
+    const winW = Math.max(minW, Math.floor((availW - (cols - 1) * 3) / cols));
+    const winH = Math.max(minH, Math.floor((availH - (rows - 1) * 4) / rows));
 
     const stepX = cols > 1 ? (availW - winW) / (cols - 1) : 0;
     const stepY = rows > 1 ? (availH - winH) / (rows - 1) : 0;
@@ -142,11 +145,17 @@ export function drawBuilding(
 
       // Pastikan jendela berada dalam bagian gedung yang masih berdiri
       if (winY >= topY + 2) {
+        const rect = { x: winX, y: winY, w: winW, h: winH };
+
+        // Jendela yang membentuk huruf menyala penuh dengan warna hangat seragam (#ffd27a)
+        if (win.isLetter) {
+          warmBright.push(rect);
+          continue;
+        }
+
         // Pseudo-random deterministik untuk variasi kecerahan
         const raw = Math.sin(win.col * 12.9898 + win.row * 78.233 + building.id * 37.719) * 43758.5453;
         const norm = Math.abs(raw - Math.floor(raw));
-
-        const rect = { x: winX, y: winY, w: winW, h: winH };
 
         if (win.hue === "warm") {
           if (norm < 0.15) {

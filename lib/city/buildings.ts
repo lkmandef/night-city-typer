@@ -1,4 +1,4 @@
-import type { Building, BuildingKind, BuildingWindow, CityState } from "./types";
+import type { Building, BuildingKind, BuildingWindow, CityState, Separator } from "./types";
 import { mulberry32 } from "./rng";
 
 /**
@@ -97,11 +97,12 @@ export function makeBuilding(
     state: "growing",
     collapse: 0,
     lightTimer: 0,
+    collapseTimer: 0,
   };
 }
 
 /**
- * Memperbarui status animasi pertumbuhan gedung dan nyala jendela.
+ * Memperbarui status animasi pertumbuhan, nyala jendela, atau runtuhnya gedung.
  */
 export function updateBuilding(building: Building, dt: number): void {
   if (building.state === "growing") {
@@ -112,8 +113,8 @@ export function updateBuilding(building: Building, dt: number): void {
     }
   }
 
-  // Setelah grow > 0.6, jendela mulai dinyalakan bertahap
-  if (building.grow > 0.6) {
+  // Setelah grow > 0.6 dan belum collapsing, jendela mulai dinyalakan bertahap
+  if (building.grow > 0.6 && building.state !== "collapsing") {
     building.lightTimer = (building.lightTimer ?? 0) + dt;
     for (const win of building.windows) {
       if (!win.lit && win.litAt >= 0 && building.lightTimer >= win.litAt) {
@@ -121,15 +122,77 @@ export function updateBuilding(building: Building, dt: number): void {
       }
     }
   }
+
+  // Animasi runtuh (collapsing) saat tombol backspace ditekan
+  if (building.state === "collapsing") {
+    building.collapseTimer = (building.collapseTimer ?? 0) + dt;
+
+    // 1. Jendela padam berurutan dari atas ke bawah selama ~200 ms
+    const maxRow = building.windows.reduce((max, w) => Math.max(max, w.row), 0);
+    const fadeRatio = Math.min(1, building.collapseTimer / 200);
+    for (const win of building.windows) {
+      if (win.row >= Math.floor((1 - fadeRatio) * (maxRow + 1))) {
+        win.lit = false;
+      }
+    }
+
+    // 2. Collapse gedung naik dari 0 ke 1 selama ~700 ms
+    if (building.collapseTimer > 150) {
+      building.collapse = Math.min(1, (building.collapseTimer - 150) / 700);
+    }
+  }
 }
 
 /**
- * Memperbarui seluruh item di dalam kota.
+ * Memperbarui status pemisah (muncul atau mundur saat backspace).
  */
-export function updateCity(state: CityState, dt: number): void {
+export function updateSeparator(sep: Separator, dt: number): void {
+  if (sep.state === "entering" || sep.state === undefined) {
+    sep.progress = Math.min(1, sep.progress + dt / 400);
+    if (sep.progress >= 1) {
+      sep.state = "alive";
+    }
+  } else if (sep.state === "collapsing") {
+    sep.progress = Math.max(0, sep.progress - dt / 300);
+  }
+}
+
+/**
+ * Memperbarui seluruh item di dalam kota serta menghapus item yang sudah selesai runtuh.
+ */
+export function updateCity(state: CityState, dt: number, initialCursorX = 60): void {
   for (const item of state.items) {
     if ("windows" in item) {
       updateBuilding(item, dt);
+    } else {
+      updateSeparator(item, dt);
+    }
+  }
+
+  // Hapus item dari ujung kanan jika sudah selesai runtuh
+  let removedAny = false;
+  while (state.items.length > 0) {
+    const last = state.items[state.items.length - 1];
+    const isFinishedBuilding =
+      "windows" in last && last.state === "collapsing" && last.collapse >= 1;
+    const isFinishedSeparator =
+      "progress" in last && last.state === "collapsing" && last.progress <= 0;
+
+    if (isFinishedBuilding || isFinishedSeparator) {
+      state.items.pop();
+      removedAny = true;
+    } else {
+      break;
+    }
+  }
+
+  // Kembalikan posisi cursorX ke ujung item terakhir setelah penghapusan
+  if (removedAny) {
+    if (state.items.length === 0) {
+      state.cursorX = initialCursorX;
+    } else {
+      const last = state.items[state.items.length - 1];
+      state.cursorX = last.x + last.width + ("windows" in last ? 4 : 0);
     }
   }
 }

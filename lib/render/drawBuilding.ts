@@ -2,7 +2,8 @@ import type { Building } from "@/lib/city/types";
 import { easeOutCubic } from "@/lib/utils/easing";
 
 /**
- * Menggambar satu gedung dengan animasi tumbuh, antena tower, dan jendela menyala.
+ * Menggambar satu gedung dengan animasi tumbuh, antena tower, jendela menyala,
+ * goyangan horizontal saat runtuh, dan partikel debu.
  */
 export function drawBuilding(
   ctx: CanvasRenderingContext2D,
@@ -10,24 +11,37 @@ export function drawBuilding(
   groundY: number,
   time: number
 ): void {
-  const currentHeight = building.height * easeOutCubic(building.grow);
-  if (currentHeight <= 0) return;
+  // Hitung tinggi saat ini berdasarkan fase tumbuh atau runtuh
+  let currentHeight = building.height * easeOutCubic(building.grow);
+  if (building.state === "collapsing") {
+    currentHeight = building.height * (1 - easeOutCubic(building.collapse));
+  }
 
+  if (currentHeight <= 0.5) return;
+
+  // Goyangan horizontal halus (maksimal 2 px) saat runtuh
+  const jitterX =
+    building.state === "collapsing" && building.collapse > 0 && building.collapse < 1
+      ? Math.sin(time / 15 + building.id * 10) * 2 * (1 - building.collapse)
+      : 0;
+
+  const drawX = building.x + jitterX;
   const topY = groundY - currentHeight;
 
-  // 1. Badan gedung: persegi panjang gelap (#0e1327)
+  // 1. Badan gedung: persegi panjang gelap (#11172e)
   ctx.fillStyle = "#11172e";
-  ctx.fillRect(building.x, topY, building.width, currentHeight);
+  ctx.fillRect(drawX, topY, building.width, currentHeight);
 
-  // Stroke tepi gedung untuk siluet yang jelas
+  // Stroke tepi gedung untuk siluet yang tegas
   ctx.strokeStyle = "rgba(42, 54, 88, 0.6)";
   ctx.lineWidth = 1;
-  ctx.strokeRect(building.x, topY, building.width, currentHeight);
+  ctx.strokeRect(drawX, topY, building.width, currentHeight);
 
-  // 2. Tower aksen: Antena dan lampu merah berkedip
-  if (building.kind === "tower") {
-    const antennaX = Math.round(building.x + building.width / 2);
-    const antennaHeight = 22 * easeOutCubic(building.grow);
+  // 2. Tower aksen: Antena dan lampu merah berkedip (hanya saat belum runtuh)
+  if (building.kind === "tower" && building.collapse < 0.3) {
+    const antennaX = Math.round(drawX + building.width / 2);
+    const antennaScale = (1 - building.collapse / 0.3) * easeOutCubic(building.grow);
+    const antennaHeight = 22 * antennaScale;
     const antennaTipY = topY - antennaHeight;
 
     ctx.strokeStyle = "#4a5568";
@@ -37,9 +51,9 @@ export function drawBuilding(
     ctx.lineTo(antennaX, antennaTipY);
     ctx.stroke();
 
-    // Lampu merah berkedip di puncak antena (berkedip tiap ~200ms)
+    // Lampu merah berkedip di puncak antena
     const isBlinking = Math.sin(time / 200) > 0;
-    if (isBlinking && building.grow > 0.8) {
+    if (isBlinking && building.grow > 0.8 && building.state !== "collapsing") {
       ctx.fillStyle = "rgba(255, 77, 109, 0.4)";
       ctx.beginPath();
       ctx.arc(antennaX, antennaTipY, 3.5, 0, Math.PI * 2);
@@ -74,11 +88,11 @@ export function drawBuilding(
     for (const win of building.windows) {
       if (!win.lit) continue;
 
-      const winX = Math.round(building.x + padX + win.col * stepX);
+      const winX = Math.round(drawX + padX + win.col * stepX);
       const winYFromBottom = padY + win.row * stepY;
       const winY = Math.round(groundY - winYFromBottom - winH);
 
-      // Pastikan jendela berada dalam bagian gedung yang sudah tumbuh
+      // Pastikan jendela berada dalam bagian gedung yang masih berdiri
       if (winY >= topY + 2) {
         if (win.hue === "warm") {
           warmRects.push({ x: winX, y: winY, w: winW, h: winH });
@@ -88,7 +102,6 @@ export function drawBuilding(
       }
     }
 
-    // Gambar seluruh jendela warm (#ffd27a) sekaligus dalam satu path
     if (warmRects.length > 0) {
       ctx.beginPath();
       for (const r of warmRects) {
@@ -98,7 +111,6 @@ export function drawBuilding(
       ctx.fill();
     }
 
-    // Gambar seluruh jendela cool (#7fd6ff) sekaligus dalam satu path
     if (coolRects.length > 0) {
       ctx.beginPath();
       for (const r of coolRects) {
@@ -107,6 +119,22 @@ export function drawBuilding(
       ctx.fillStyle = "#7fd6ff";
       ctx.fill();
     }
+  }
+
+  // 4. Partikel debu kecil saat gedung runtuh
+  if (building.state === "collapsing" && building.collapse > 0.05 && building.collapse < 1) {
+    const dustCount = 6;
+    const dustAlpha = (1 - building.collapse) * 0.4;
+    ctx.fillStyle = `rgba(180, 195, 220, ${dustAlpha})`;
+    ctx.beginPath();
+    for (let i = 0; i < dustCount; i++) {
+      const px =
+        drawX + (building.width / (dustCount + 1)) * (i + 1) + Math.sin(i * 17 + time / 40) * 5;
+      const py = groundY - (1 - building.collapse) * ((i % 3) + 1) * 6;
+      ctx.moveTo(px, py);
+      ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+    }
+    ctx.fill();
   }
 }
 

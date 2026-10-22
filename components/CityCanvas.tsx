@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { Building, CityAction, CityState } from "@/lib/city/types";
+import type { Building, CityAction, CityState, Separator } from "@/lib/city/types";
 import { cityReducer, createInitialCityState } from "@/lib/city/reducer";
 import { updateCity } from "@/lib/city/buildings";
 import { drawGround, drawSky } from "@/lib/render/sky";
 import { drawBuildings } from "@/lib/render/drawBuilding";
+import { drawSeparators } from "@/lib/render/separators";
 import HiddenInput from "@/components/HiddenInput";
 
 function subscribeToLocation(callback: () => void) {
@@ -139,10 +140,10 @@ export default function CityCanvas() {
       const dt = Math.min(50, currentTime - lastTime);
       lastTime = currentTime;
 
-      // Update animasi tumbuh dan jendela menyala
-      updateCity(cityStateRef.current, dt);
-
       const { width, height } = sizeRef.current;
+      const initialX = Math.max(40, Math.round(width * 0.1));
+      updateCity(cityStateRef.current, dt, initialX);
+
       if (width > 0 && height > 0) {
         const groundY = height * 0.85;
 
@@ -151,14 +152,20 @@ export default function CityCanvas() {
         // 1. Gambar latar langit
         drawSky(ctx, width, height);
 
-        // 2. Gambar gedung yang tumbuh
+        // 2. Gambar dasar tanah
+        drawGround(ctx, width, height);
+
+        // 3. Gambar pemisah (jalan, sungai, taman)
+        const separators = cityStateRef.current.items.filter(
+          (item): item is Separator => "progress" in item
+        );
+        drawSeparators(ctx, separators, groundY, currentTime);
+
+        // 4. Gambar gedung
         const buildings = cityStateRef.current.items.filter(
           (item): item is Building => "windows" in item
         );
         drawBuildings(ctx, buildings, groundY, currentTime);
-
-        // 3. Gambar dasar tanah
-        drawGround(ctx, width, height);
       }
 
       rafId = requestAnimationFrame(loop);

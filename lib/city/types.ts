@@ -34,6 +34,7 @@ export interface Building {
   state: "growing" | "alive" | "collapsing";
   collapse: number;
   lightTimer?: number;
+  collapseTimer?: number;
 }
 
 export type SeparatorKind = "road" | "river" | "park";
@@ -44,6 +45,7 @@ export interface Separator {
   width: number;
   kind: SeparatorKind;
   progress: number;
+  state?: "entering" | "alive" | "collapsing";
 }
 
 export type CityItem = Building | Separator;

@@ -91,6 +91,7 @@ describe("Separators & Backspace (Fase 4)", () => {
       strokeStyle: "",
       lineWidth: 0,
       fillRect: vi.fn(),
+      strokeRect: vi.fn(),
       beginPath: vi.fn(),
       moveTo: vi.fn(),
       lineTo: vi.fn(),
@@ -99,6 +100,9 @@ describe("Separators & Backspace (Fase 4)", () => {
       fill: vi.fn(),
       setLineDash: vi.fn(),
       createLinearGradient: vi.fn().mockReturnValue({
+        addColorStop: vi.fn(),
+      }),
+      createRadialGradient: vi.fn().mockReturnValue({
         addColorStop: vi.fn(),
       }),
     } as unknown as CanvasRenderingContext2D;

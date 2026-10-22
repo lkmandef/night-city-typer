@@ -52,7 +52,7 @@ export function cityReducer(state: CityState, action: CityAction): CityState {
       const kinds: SeparatorKind[] = ["road", "river", "park"];
       const rand = mulberry32(state.seed + state.items.length * 359);
       const kind = kinds[Math.floor(rand() * kinds.length)];
-      const width = Math.round(40 + rand() * 50); // 40 sampai 90 px
+      const width = Math.round(60 + rand() * 40); // 60 sampai 100 px
 
       const separator: Separator = {
         id: state.items.length,

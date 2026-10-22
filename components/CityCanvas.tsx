@@ -13,7 +13,7 @@ import {
 import { generateStars } from "@/lib/render/stars";
 import { createParallaxRenderer } from "@/lib/render/parallax";
 import { renderScene } from "@/lib/render/pipeline";
-import HiddenInput from "@/components/HiddenInput";
+import HiddenInput, { type InputDebugInfo } from "@/components/HiddenInput";
 import TuningPanel from "@/components/TuningPanel";
 
 function subscribeToLocation(callback: () => void) {
@@ -37,6 +37,13 @@ export default function CityCanvas() {
   const parallaxRef = useRef(createParallaxRenderer());
 
   const [debugAction, setDebugAction] = useState<string | null>(null);
+  const [lastActionSource, setLastActionSource] = useState<string>("-");
+  const [inputDebug, setInputDebug] = useState<InputDebugInfo>({
+    inputType: "-",
+    isComposing: false,
+    data: "-",
+    valueLength: 0,
+  });
   const [focusDebugInfo, setFocusDebugInfo] = useState<string>("Belum ada event fokus");
   const [buildingCount, setBuildingCount] = useState<number>(0);
   const [cameraDebugInfo, setCameraDebugInfo] = useState<string>("");
@@ -56,7 +63,10 @@ export default function CityCanvas() {
   });
 
   const handleAction = useCallback(
-    (action: CityAction, source: "keydown" | "beforeinput") => {
+    (
+      action: CityAction,
+      source: "diff" | "window-keydown" | "keydown" | "beforeinput"
+    ) => {
       const now = performance.now();
       const actionKey =
         action.type === "TYPE_CHAR" ? `CHAR_${action.char}` : action.type;
@@ -81,15 +91,16 @@ export default function CityCanvas() {
 
       if (isDebug) {
         setBuildingCount(nextState.items.length);
+        setLastActionSource(source);
         setDebugAction(
-          `${action.type}${action.type === "TYPE_CHAR" ? ` ('${action.char}')` : ""} [${source}]`
+          `${action.type}${action.type === "TYPE_CHAR" ? ` ('${action.char}')` : ""}`
         );
       }
     },
     [isDebug]
   );
 
-  // Tangani event keyboard desktop
+  // Tangani event keyboard desktop (diabaikan jika HiddenInput sedang fokus)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Abaikan jika modifier ditekan
@@ -97,15 +108,21 @@ export default function CityCanvas() {
         return;
       }
 
+      // Handler keydown di window harus diabaikan jika document.activeElement adalah HiddenInput
+      const active = document.activeElement;
+      if (active && (active.id === "city-full-input" || active.tagName === "INPUT")) {
+        return;
+      }
+
       if (e.key === "Backspace") {
-        handleAction({ type: "BACKSPACE" }, "keydown");
+        handleAction({ type: "BACKSPACE" }, "window-keydown");
       } else if (e.key === " ") {
         e.preventDefault();
-        handleAction({ type: "SPACE" }, "keydown");
+        handleAction({ type: "SPACE" }, "window-keydown");
       } else if (e.key === "Enter") {
-        handleAction({ type: "ENTER" }, "keydown");
+        handleAction({ type: "ENTER" }, "window-keydown");
       } else if (e.key.length === 1) {
-        handleAction({ type: "TYPE_CHAR", char: e.key }, "keydown");
+        handleAction({ type: "TYPE_CHAR", char: e.key }, "window-keydown");
       }
     };
 
@@ -243,11 +260,20 @@ export default function CityCanvas() {
         className="fixed inset-0 h-full w-full block pointer-events-none"
         aria-label="Night City Typer interactive canvas"
       />
-      <HiddenInput onAction={handleAction} onFocusChange={setFocusDebugInfo} />
+      <HiddenInput
+        onAction={handleAction}
+        onFocusChange={setFocusDebugInfo}
+        onDebugChange={setInputDebug}
+      />
       <TuningPanel />
       {isDebug && (
         <div className="fixed bottom-3 left-3 z-50 rounded bg-black/90 p-2.5 font-mono text-xs text-emerald-400 border border-emerald-800 pointer-events-none select-none max-w-sm space-y-1">
-          <div>Aksi: {debugAction || "(belum ada)"}</div>
+          <div>
+            Aksi: {debugAction || "(belum ada)"} [{lastActionSource}]
+          </div>
+          <div>
+            Input: type={inputDebug.inputType} | comp={String(inputDebug.isComposing)} | data=&quot;{inputDebug.data}&quot; | len={inputDebug.valueLength}
+          </div>
           <div>Fokus: {focusDebugInfo}</div>
           <div>Gedung: {buildingCount}</div>
           <div>{cameraDebugInfo || "Memuat info kamera..."}</div>

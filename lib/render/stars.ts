@@ -46,15 +46,18 @@ export function drawStars(
   stars: Star[],
   width: number,
   height: number,
-  time: number
+  time: number,
+  starsAlpha = 1.0
 ): void {
+  if (starsAlpha <= 0.02) return;
+
   for (const s of stars) {
     const sx = Math.round(s.x * width);
     const sy = Math.round(s.y * height);
 
     // Osilasi kedip halus
     const flicker = 0.5 + 0.5 * Math.sin((time / 1000) * s.speed + s.phase);
-    const alpha = (0.2 + 0.8 * flicker) * s.brightness;
+    const alpha = (0.2 + 0.8 * flicker) * s.brightness * starsAlpha;
 
     ctx.fillStyle = `${s.color} ${alpha.toFixed(2)})`;
     ctx.fillRect(sx, sy, s.size, s.size);

@@ -110,8 +110,47 @@ export function cityReducer(state: CityState, action: CityAction): CityState {
       };
     }
 
+    case "ENTER": {
+      // Ganti fase waktu: 0 (malam) -> 1 (dini hari) -> 2 (fajar) -> 0 ...
+      const nextTime = ((state.timeOfDay ?? 0) + 1) % 3;
+      return {
+        ...state,
+        timeOfDay: nextTime,
+      };
+    }
+
     case "RESET": {
-      return createInitialCityState(state.seed);
+      // Jika kota sudah kosong, kembalikan ke state awal
+      if (state.items.length === 0) {
+        return {
+          ...createInitialCityState(state.seed),
+          timeOfDay: state.timeOfDay,
+        };
+      }
+
+      // Animasi runtuh beruntun cepat dari kanan ke kiri
+      const count = state.items.length;
+      const stepDelay = Math.min(30, Math.max(8, Math.floor(300 / count)));
+
+      return {
+        ...state,
+        items: state.items.map((item, index) => {
+          if (item.state === "collapsing") return item;
+          const reverseIdx = count - 1 - index;
+          if ("windows" in item) {
+            return {
+              ...item,
+              state: "collapsing",
+              collapseTimer: -reverseIdx * stepDelay,
+            };
+          } else {
+            return {
+              ...item,
+              state: "collapsing",
+            };
+          }
+        }),
+      };
     }
 
     default:

@@ -13,8 +13,13 @@ import {
 import { generateStars } from "@/lib/render/stars";
 import { createParallaxRenderer } from "@/lib/render/parallax";
 import { renderScene } from "@/lib/render/pipeline";
+import { interpolatePalette, TIME_PALETTES } from "@/lib/render/sky";
+import { exportCanvasToPng } from "@/lib/render/exportPng";
+import { easeInOutCubic } from "@/lib/utils/easing";
 import HiddenInput, { type InputDebugInfo } from "@/components/HiddenInput";
 import TuningPanel from "@/components/TuningPanel";
+import HintOverlay from "@/components/HintOverlay";
+import Toolbar from "@/components/Toolbar";
 
 function subscribeToLocation(callback: () => void) {
   window.addEventListener("popstate", callback);
@@ -35,6 +40,17 @@ export default function CityCanvas() {
   const cityStateRef = useRef<CityState>(createInitialCityState());
   const starsRef = useRef(generateStars(140, 8888));
   const parallaxRef = useRef(createParallaxRenderer());
+
+  const [isCityEmpty, setIsCityEmpty] = useState(true);
+  const wasEmptyRef = useRef(true);
+  const [timePhaseName, setTimePhaseName] = useState("Malam");
+
+  const timeTransitionRef = useRef({
+    fromPhase: 0,
+    toPhase: 0,
+    progress: 1,
+    duration: 1200,
+  });
 
   const [debugAction, setDebugAction] = useState<string | null>(null);
   const [lastActionSource, setLastActionSource] = useState<string>("-");
@@ -86,6 +102,26 @@ export default function CityCanvas() {
       const nextState = cityReducer(cityStateRef.current, action);
       cityStateRef.current = nextState;
 
+      // Tangani transisi waktu saat aksi ENTER
+      if (action.type === "ENTER") {
+        timeTransitionRef.current = {
+          fromPhase: timeTransitionRef.current.toPhase,
+          toPhase: nextState.timeOfDay,
+          progress: 0,
+          duration: 1200,
+        };
+        setTimePhaseName(TIME_PALETTES[nextState.timeOfDay].phaseName);
+      }
+
+      // Langsung sembunyikan petunjuk saat ada karakter baru
+      if (
+        (action.type === "TYPE_CHAR" || action.type === "SPACE") &&
+        wasEmptyRef.current
+      ) {
+        wasEmptyRef.current = false;
+        setIsCityEmpty(false);
+      }
+
       // Log aksi di console
       console.log(`[CityInput] (${source})`, action);
 
@@ -99,6 +135,26 @@ export default function CityCanvas() {
     },
     [isDebug]
   );
+
+  const handleSavePng = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    exportCanvasToPng(canvas);
+  }, []);
+
+  const handleReset = useCallback(() => {
+    handleAction({ type: "RESET" }, "diff");
+    if (typeof document !== "undefined") {
+      document.getElementById("city-full-input")?.focus();
+    }
+  }, [handleAction]);
+
+  const handleEnter = useCallback(() => {
+    handleAction({ type: "ENTER" }, "diff");
+    if (typeof document !== "undefined") {
+      document.getElementById("city-full-input")?.focus();
+    }
+  }, [handleAction]);
 
   // Tangani event keyboard desktop (diabaikan jika HiddenInput sedang fokus)
   useEffect(() => {
@@ -196,6 +252,27 @@ export default function CityCanvas() {
       const initialX = Math.round(worldScreenWidth * 0.15);
       updateCity(cityStateRef.current, dt, initialX);
 
+      // Periksa apakah kota kosong untuk menampilkan kembali HintOverlay
+      const empty = cityStateRef.current.items.length === 0;
+      if (empty !== wasEmptyRef.current) {
+        wasEmptyRef.current = empty;
+        setIsCityEmpty(empty);
+      }
+
+      // Update progres transisi suasana waktu (malam, dini hari, fajar)
+      if (timeTransitionRef.current.progress < 1) {
+        timeTransitionRef.current.progress = Math.min(
+          1,
+          timeTransitionRef.current.progress + dt / timeTransitionRef.current.duration
+        );
+      }
+      const easeT = easeInOutCubic(timeTransitionRef.current.progress);
+      const currentPalette = interpolatePalette(
+        timeTransitionRef.current.fromPhase,
+        timeTransitionRef.current.toPhase,
+        easeT
+      );
+
       if (width > 0 && height > 0) {
         const groundY = height * 0.85;
         const cameraX = cityStateRef.current.cameraX;
@@ -230,12 +307,13 @@ export default function CityCanvas() {
           visibleSeparators,
           visibleBuildings,
           time: currentTime,
+          palette: currentPalette,
         });
 
         // Debug info update
         if (isDebug && Math.floor(currentTime) % 10 === 0) {
           setCameraDebugInfo(
-            `Cam: ${Math.round(cameraX)} | Skala: ${worldScale.toFixed(2)} | Vis: ${visibleBuildings.length}/${allBuildings.length}`
+            `Cam: ${Math.round(cameraX)} | Skala: ${worldScale.toFixed(2)} | Vis: ${visibleBuildings.length}/${allBuildings.length} | Waktu: ${currentPalette.phaseName}`
           );
         }
       }
@@ -264,6 +342,13 @@ export default function CityCanvas() {
         onAction={handleAction}
         onFocusChange={setFocusDebugInfo}
         onDebugChange={setInputDebug}
+      />
+      <HintOverlay visible={isCityEmpty} />
+      <Toolbar
+        onSavePng={handleSavePng}
+        onReset={handleReset}
+        onEnter={handleEnter}
+        timePhaseName={timePhaseName}
       />
       <TuningPanel />
       {isDebug && (

@@ -1,5 +1,5 @@
 import type { Building, Separator } from "@/lib/city/types";
-import { drawGround, drawMoon, drawSky } from "./sky";
+import { drawGround, drawMoon, drawSky, type TimePalette } from "./sky";
 import { drawStars, type Star } from "./stars";
 import { type ParallaxRenderer } from "./parallax";
 import { drawSeparators } from "./separators";
@@ -17,6 +17,7 @@ export interface RenderPipelineOptions {
   visibleSeparators: Separator[];
   visibleBuildings: Building[];
   time: number;
+  palette?: TimePalette;
 }
 
 /**
@@ -69,22 +70,23 @@ export function renderScene(options: RenderPipelineOptions): void {
     visibleSeparators,
     visibleBuildings,
     time,
+    palette,
   } = options;
 
-  // 1. Langit malam
-  drawSky(ctx, width, height);
+  // 1. Langit malam / dini hari / fajar
+  drawSky(ctx, width, height, palette);
 
   // 2. Bintang berkedip
-  drawStars(ctx, stars, width, height, time);
+  drawStars(ctx, stars, width, height, time, palette?.starsAlpha ?? 1.0);
 
   // 3. Bulan dengan pendaran radial lembut
-  drawMoon(ctx, width, height, time);
+  drawMoon(ctx, width, height, time, palette?.moonAlpha ?? 1.0);
 
   // 4. Gedung latar (dua lapis parallax 0.2x dan 0.4x)
   parallax.draw(ctx, cameraX, groundY);
 
   // 5. Dasar tanah
-  drawGround(ctx, width, height);
+  drawGround(ctx, width, height, palette);
 
   // 6. Objek dunia (Pemisah, Gedung, Partikel) dengan skala dan kamera
   ctx.save();
@@ -93,7 +95,7 @@ export function renderScene(options: RenderPipelineOptions): void {
   ctx.translate(-cameraX, -groundY);
 
   drawSeparators(ctx, visibleSeparators, groundY, time);
-  drawBuildings(ctx, visibleBuildings, groundY, time);
+  drawBuildings(ctx, visibleBuildings, groundY, time, palette?.windowLitFactor ?? 1.0);
   drawFireflies(ctx, visibleSeparators, groundY, time);
 
   ctx.restore();

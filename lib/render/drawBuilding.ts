@@ -19,7 +19,8 @@ export function drawBuilding(
   ctx: CanvasRenderingContext2D,
   building: Building,
   groundY: number,
-  time: number
+  time: number,
+  windowLitFactor = 1.0
 ): void {
   // Hitung tinggi saat ini berdasarkan fase tumbuh atau runtuh
   let currentHeight = building.height * easeOutCubic(building.grow);
@@ -191,12 +192,13 @@ export function drawBuilding(
           // Jendela belum menyala selama animasi tumbuh: gambar samar
           unlitRects.push(regularRect);
         } else {
-          // Evaluasi status menyala dinamis berdasarkan config saat ini
-          const litThreshold = win.isZone
+          // Evaluasi status menyala dinamis berdasarkan config saat ini dan fase waktu
+          const baseLitThreshold = win.isZone
             ? currentConfig.ZONE_LIT_RATIO
             : win.isStorefront
             ? 0.85
             : currentConfig.OTHER_LIT_RATIO;
+          const litThreshold = baseLitThreshold * windowLitFactor;
 
           const isLit = (win.rawLitRand ?? 0) < litThreshold;
 
@@ -337,6 +339,12 @@ export function drawBuilding(
           Math.sin(win.col * 12.9898 + win.row * 78.233 + building.id * 37.719) * 43758.5453;
         const norm = Math.abs(raw - Math.floor(raw));
 
+        // Jika fase waktu mengurangi jumlah lampu, sebagian jendela non-glyph padam
+        if (norm > windowLitFactor) {
+          unlitProc.push(rect);
+          continue;
+        }
+
         if (win.hue === "warm") {
           if (norm < 0.15) {
             warmDim.push(rect);
@@ -471,9 +479,10 @@ export function drawBuildings(
   ctx: CanvasRenderingContext2D,
   buildings: Building[],
   groundY: number,
-  time: number
+  time: number,
+  windowLitFactor = 1.0
 ): void {
   for (const b of buildings) {
-    drawBuilding(ctx, b, groundY, time);
+    drawBuilding(ctx, b, groundY, time, windowLitFactor);
   }
 }

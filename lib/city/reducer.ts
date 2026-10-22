@@ -1,6 +1,7 @@
 import type { CityAction, CityState, Separator, SeparatorKind } from "./types";
 import { LETTER_BUILDING_GAP, makeBuilding } from "./buildings";
 import { mulberry32 } from "./rng";
+import { currentConfig } from "./config";
 
 /**
  * State awal kota malam.
@@ -53,7 +54,17 @@ export function cityReducer(state: CityState, action: CityAction): CityState {
       const kinds: SeparatorKind[] = ["road", "river", "park"];
       const rand = mulberry32(state.seed + state.items.length * 359);
       const kind = kinds[Math.floor(rand() * kinds.length)];
-      const width = Math.round(60 + rand() * 40); // 60 sampai 100 px
+      const width =
+        kind === "road"
+          ? Math.round(
+              currentConfig.ROAD_MIN_WIDTH +
+                rand() * (currentConfig.ROAD_MAX_WIDTH - currentConfig.ROAD_MIN_WIDTH)
+            )
+          : Math.round(
+              currentConfig.RIVER_PARK_MIN_WIDTH +
+                rand() *
+                  (currentConfig.RIVER_PARK_MAX_WIDTH - currentConfig.RIVER_PARK_MIN_WIDTH)
+            );
 
       const separator: Separator = {
         id: state.items.length,

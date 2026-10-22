@@ -277,17 +277,36 @@ export default function TuningPanel() {
 
           <div className="flex flex-col gap-1">
             <div className="flex justify-between">
-              <span>Warna Dingin (COOL_RATIO):</span>
-              <span className="text-emerald-400">{config.COOL_COLOR_RATIO.toFixed(2)}</span>
+              <span>Warna Dominan Gedung:</span>
+              <span className="text-emerald-400">{(config.DOMINANT_COLOR_RATIO * 100).toFixed(0)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0.5"
+              max="0.95"
+              step="0.05"
+              value={config.DOMINANT_COLOR_RATIO}
+              onChange={(e) => {
+                updateConfig({ DOMINANT_COLOR_RATIO: parseFloat(e.target.value) });
+                keepTypingFocus();
+              }}
+              className="accent-emerald-400 h-1.5 cursor-pointer bg-slate-800 rounded"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <div className="flex justify-between">
+              <span>Warna Minor (Maks 2%):</span>
+              <span className="text-emerald-400">{(config.ACCENT_COLOR_RATIO * 100).toFixed(1)}%</span>
             </div>
             <input
               type="range"
               min="0.0"
-              max="0.6"
-              step="0.05"
-              value={config.COOL_COLOR_RATIO}
+              max="0.02"
+              step="0.005"
+              value={config.ACCENT_COLOR_RATIO}
               onChange={(e) => {
-                updateConfig({ COOL_COLOR_RATIO: parseFloat(e.target.value) });
+                updateConfig({ ACCENT_COLOR_RATIO: parseFloat(e.target.value) });
                 keepTypingFocus();
               }}
               className="accent-emerald-400 h-1.5 cursor-pointer bg-slate-800 rounded"
@@ -298,60 +317,41 @@ export default function TuningPanel() {
         {/* Bobot Kolom Lebar Gedung */}
         <section className="space-y-1.5">
           <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-            Bobot Kolom Gedung (5 / 7 / 9)
+            Bobot Kolom Gedung (5 / 7 Kolom)
           </div>
-          <div className="grid grid-cols-3 gap-1.5">
-            <div className="flex flex-col items-center rounded bg-slate-900 p-1 border border-white/5">
-              <span className="text-[10px] text-slate-400">5 Kolom</span>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col items-center rounded bg-slate-900 p-1.5 border border-white/5">
+              <span className="text-[10px] text-slate-400">5 Kolom (65%)</span>
               <span className="text-emerald-400 font-bold">{config.COL_WEIGHTS[5]}</span>
               <input
                 type="range"
-                min="0.1"
-                max="1.0"
+                min="0.2"
+                max="0.9"
                 step="0.05"
                 value={config.COL_WEIGHTS[5]}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);
                   updateConfig({
-                    COL_WEIGHTS: { ...config.COL_WEIGHTS, 5: val },
+                    COL_WEIGHTS: { 5: val, 7: parseFloat((1 - val).toFixed(2)) },
                   });
                   keepTypingFocus();
                 }}
                 className="w-full accent-emerald-400 h-1 mt-1 cursor-pointer"
               />
             </div>
-            <div className="flex flex-col items-center rounded bg-slate-900 p-1 border border-white/5">
-              <span className="text-[10px] text-slate-400">7 Kolom</span>
+            <div className="flex flex-col items-center rounded bg-slate-900 p-1.5 border border-white/5">
+              <span className="text-[10px] text-slate-400">7 Kolom (35%)</span>
               <span className="text-emerald-400 font-bold">{config.COL_WEIGHTS[7]}</span>
               <input
                 type="range"
-                min="0.0"
+                min="0.1"
                 max="0.8"
                 step="0.05"
                 value={config.COL_WEIGHTS[7]}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);
                   updateConfig({
-                    COL_WEIGHTS: { ...config.COL_WEIGHTS, 7: val },
-                  });
-                  keepTypingFocus();
-                }}
-                className="w-full accent-emerald-400 h-1 mt-1 cursor-pointer"
-              />
-            </div>
-            <div className="flex flex-col items-center rounded bg-slate-900 p-1 border border-white/5">
-              <span className="text-[10px] text-slate-400">9 Kolom</span>
-              <span className="text-emerald-400 font-bold">{config.COL_WEIGHTS[9]}</span>
-              <input
-                type="range"
-                min="0.0"
-                max="0.5"
-                step="0.05"
-                value={config.COL_WEIGHTS[9]}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  updateConfig({
-                    COL_WEIGHTS: { ...config.COL_WEIGHTS, 9: val },
+                    COL_WEIGHTS: { 5: parseFloat((1 - val).toFixed(2)), 7: val },
                   });
                   keepTypingFocus();
                 }}

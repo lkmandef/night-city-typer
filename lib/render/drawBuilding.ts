@@ -203,55 +203,70 @@ export function drawBuilding(
           if (!isLit) {
             unlitRects.push(regularRect);
           } else {
-            // Hitung kecerahan
+            // Tentukan warna dan kecerahan sesuai aturan kohesif
+            const dominantHue = building.dominantHue ?? "warm";
+            const secondaryHue = dominantHue === "warm" ? "cool" : "warm";
+
             let b: number;
+            let rgb: [number, number, number];
+
             if (win.isZone) {
+              // Zona huruf 5x7: jendela non-huruf memakai SATU warna saja (warna dominan gedung), tanpa variasi
               b =
                 currentConfig.ZONE_BRIGHTNESS_MIN +
                 (win.rawBrightnessRand ?? 0.5) *
                   (currentConfig.ZONE_BRIGHTNESS_MAX - currentConfig.ZONE_BRIGHTNESS_MIN);
+
+              // Warna mono dominan
+              rgb = dominantHue === "warm" ? [242, 169, 59] : [63, 143, 208];
             } else {
+              // Di luar zona huruf: 75% warna dominan, 25% warna dasar lain, maks 2% aksen teal/magenta
               b =
                 currentConfig.BG_BRIGHTNESS_MIN +
                 (win.rawBrightnessRand ?? 0.5) *
                   (currentConfig.BG_BRIGHTNESS_MAX - currentConfig.BG_BRIGHTNESS_MIN);
-            }
-            if (win.isHalo) {
-              b *= currentConfig.HALO_BRIGHTNESS;
-            }
-            if (win.isStorefront) {
-              b = Math.min(1.0, b * 1.25);
-            }
 
-            // Hitung warna: 65% hangat (amber, oranye, emas), 30% dingin (biru), 5% aksen (teal/magenta)
-            const coolRatio = currentConfig.COOL_COLOR_RATIO;
-            const accentRatio = currentConfig.ACCENT_COLOR_RATIO;
-            const warmLimit = Math.max(0, 1 - (coolRatio + accentRatio));
-            const rawColor = win.rawColorIndex ?? 0;
+              if (win.isHalo) {
+                b *= currentConfig.HALO_BRIGHTNESS;
+              }
+              if (win.isStorefront) {
+                b = Math.min(1.0, b * 1.2);
+              }
 
-            let rgb: [number, number, number];
-            if (rawColor < warmLimit) {
-              const sub = rawColor / (warmLimit || 1);
-              if (sub < 0.45) {
-                rgb = [242, 169, 59]; // amber #f2a93b
-              } else if (sub < 0.75) {
-                rgb = [232, 137, 58]; // oranye #e8893a
+              const rawColor = win.rawColorIndex ?? 0;
+              const accentRatio = currentConfig.ACCENT_COLOR_RATIO; // maks 0.02 (2%)
+
+              if (rawColor < accentRatio) {
+                // Warna minor: teal atau magenta redup, kecerahan maksimal 0.4
+                b = Math.min(b, currentConfig.ACCENT_BRIGHTNESS_MAX);
+                const sub = rawColor / (accentRatio || 0.02);
+                rgb = sub < 0.5 ? [45, 212, 191] : [192, 38, 211];
               } else {
-                rgb = [255, 199, 102]; // emas lembut #ffc766
-              }
-            } else if (rawColor < 1 - accentRatio) {
-              const sub = (rawColor - warmLimit) / (coolRatio || 1);
-              if (sub < 0.5) {
-                rgb = [63, 143, 208]; // biru #3f8fd0
-              } else {
-                rgb = [47, 111, 176]; // biru #2f6fb0
-              }
-            } else {
-              const sub = (rawColor - (1 - accentRatio)) / (accentRatio || 1);
-              if (sub < 0.5) {
-                rgb = [45, 212, 191]; // teal #2dd4bf
-              } else {
-                rgb = [192, 38, 211]; // magenta redup #c026d3
+                // 75% dominan gedung, 25% warna dasar lain
+                const regIndex = (rawColor - accentRatio) / (1 - accentRatio);
+                const useDominant = regIndex < currentConfig.DOMINANT_COLOR_RATIO;
+                const targetHue = useDominant ? dominantHue : secondaryHue;
+
+                const sub = useDominant
+                  ? regIndex / currentConfig.DOMINANT_COLOR_RATIO
+                  : (regIndex - currentConfig.DOMINANT_COLOR_RATIO) /
+                    (1 - currentConfig.DOMINANT_COLOR_RATIO);
+
+                if (targetHue === "warm") {
+                  if (sub < 0.45) {
+                    rgb = [242, 169, 59]; // amber #f2a93b
+                  } else if (sub < 0.75) {
+                    rgb = [232, 137, 58]; // oranye #e8893a
+                  } else {
+                    rgb = [255, 199, 102]; // emas lembut #ffc766
+                  }
+                } else {
+                  if (sub < 0.5) {
+                    rgb = [63, 143, 208]; // biru #3f8fd0
+                  } else {
+                    rgb = [47, 111, 176]; // biru #2f6fb0
+                  }
+                }
               }
             }
 

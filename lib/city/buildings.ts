@@ -59,6 +59,10 @@ export function makeBuilding(
   const kind = pickKind(char);
   const glyph = getGlyph(char);
 
+  // 1 warna dominan per gedung (warm amber/oranye atau cool biru) dari seed
+  const dominantHue: "warm" | "cool" =
+    kind === "tower" ? (rand() < 0.4 ? "warm" : "cool") : rand() < 0.65 ? "warm" : "cool";
+
   let width: number;
   let height: number;
   let gap: number;
@@ -74,19 +78,16 @@ export function makeBuilding(
   let winIdx = 0;
 
   if (glyph) {
-    // 1. Jumlah kolom ganjil: 5, 7, atau 9 kolom dengan bobot 60%, 30%, 10%
+    // 1. Jumlah kolom ganjil: HANYA 5 kolom (65%) atau 7 kolom (35%), tidak ada 9 kolom
     const colRand = rand();
     const w5 = currentConfig.COL_WEIGHTS[5];
-    const w7 = currentConfig.COL_WEIGHTS[7];
     if (colRand < w5) {
       chosenCols = 5;
-    } else if (colRand < w5 + w7) {
-      chosenCols = 7;
     } else {
-      chosenCols = 9;
+      chosenCols = 7;
     }
 
-    // Lebar gedung tepat kelipatan CELL (55, 77, atau 99 px)
+    // Lebar gedung tepat kelipatan CELL (55 atau 77 px)
     width = chosenCols * CELL;
 
     // 2. Celah antar gedung berhuruf: 4 sampai 8 px
@@ -167,13 +168,13 @@ export function makeBuilding(
             windows.push(win);
             letterWindows.push(win);
           } else {
-            // Jendela dalam zona huruf yang bukan bagian huruf (isZone = true, lebih redup)
+            // Jendela dalam zona huruf yang bukan bagian huruf memakai SATU warna saja (dominantHue)
             const win: BuildingWindow = {
               col: c,
               row: f,
               lit: false,
               litAt: 0,
-              hue: rawColorIndex < 0.65 ? "warm" : "cool",
+              hue: dominantHue,
               isLetter: false,
               isZone: true,
               rawLitRand,
@@ -304,6 +305,7 @@ export function makeBuilding(
     hasDoor,
     cols: chosenCols,
     extraFloors,
+    dominantHue,
   };
 }
 

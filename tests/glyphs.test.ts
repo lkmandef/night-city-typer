@@ -163,9 +163,9 @@ describe("Font Piksel 5x7 & Fasad Hidup (FR-15)", () => {
       // 3. Tinggi minimum gedung mencakup baseline + 7 cell + lantai ekstra
       expect(b.height).toBeGreaterThanOrEqual(150);
 
-      // 4. Lebar gedung berhuruf adalah kelipatan sel dengan kolom ganjil (5, 7, atau 9 kolom)
-      expect([55, 77, 99]).toContain(b.width);
-      expect([5, 7, 9]).toContain(b.cols);
+      // 4. Lebar gedung berhuruf adalah kelipatan sel dengan kolom ganjil (hanya 5 atau 7 kolom)
+      expect([55, 77]).toContain(b.width);
+      expect([5, 7]).toContain(b.cols);
 
       // 5. Celah antar gedung berada dalam rentang nyaman (4 sampai 8 px)
       expect(b.gap).toBeGreaterThanOrEqual(LETTER_MIN_GAP);
@@ -282,5 +282,58 @@ describe("Font Piksel 5x7 & Fasad Hidup (FR-15)", () => {
     }
     const htmlWithoutTune = renderToStaticMarkup(React.createElement(TuningPanel));
     expect(htmlWithoutTune).toBe("");
+  });
+
+  it("tidak ada gedung berhuruf dengan 9 kolom (hanya 5 atau 7 kolom dengan bobot 65% dan 35%)", () => {
+    for (let i = 0; i < 50; i++) {
+      const b = makeBuilding(String.fromCharCode(65 + (i % 26)), i, i * 70, 9988);
+      expect(b.cols).not.toBe(9);
+      expect([5, 7]).toContain(b.cols);
+      expect([55, 77]).toContain(b.width);
+    }
+  });
+
+  it("jendela non-huruf di zona huruf 5x7 memakai SATU warna saja (warna dominan gedung)", () => {
+    const chars = ["H", "A", "L", "O", "X", "Y"];
+    for (const char of chars) {
+      const b = makeBuilding(char, 0, 0, 789);
+      const zoneNonLetterWindows = b.windows.filter((w) => w.isZone);
+      expect(zoneNonLetterWindows.length).toBeGreaterThan(0);
+      const hues = new Set(zoneNonLetterWindows.map((w) => w.hue));
+      expect(hues.size).toBe(1); // Mono / satu warna seragam
+      expect(hues.has(b.dominantHue ?? "warm")).toBe(true);
+    }
+  });
+
+  it("warna minor (aksen) dibatasi maksimal 2% dari jendela fasad non-huruf", () => {
+    let totalWindows = 0;
+    let accentCount = 0;
+    for (let i = 0; i < 100; i++) {
+      const b = makeBuilding(String.fromCharCode(65 + (i % 26)), i, i * 60, 1122 + i);
+      for (const w of b.windows) {
+        if (!w.isLetter && !w.isZone) {
+          totalWindows++;
+          if ((w.rawColorIndex ?? 0) < 0.02) {
+            accentCount++;
+          }
+        }
+      }
+    }
+    const ratio = accentCount / totalWindows;
+    expect(ratio).toBeLessThanOrEqual(0.025); // ~2%, di bawah batas toleransi
+  });
+
+  it("lebar pemisah taman dan sungai berkisar antara 70 sampai 110 px", () => {
+    let state = createInitialCityState(777);
+    state = cityReducer(state, { type: "TYPE_CHAR", char: "a" });
+    for (let i = 0; i < 30; i++) {
+      state = cityReducer(state, { type: "SPACE" });
+      const last = state.items[state.items.length - 1];
+      if ("kind" in last && (last.kind === "river" || last.kind === "park")) {
+        expect(last.width).toBeGreaterThanOrEqual(70);
+        expect(last.width).toBeLessThanOrEqual(110);
+      }
+      state = cityReducer(state, { type: "TYPE_CHAR", char: "b" });
+    }
   });
 });

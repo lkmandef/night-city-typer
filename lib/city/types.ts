@@ -55,6 +55,7 @@ export interface Building {
   hasDoor?: boolean;
   cols?: number;
   extraFloors?: number;
+  dominantHue?: "warm" | "cool";
 }
 
 export type SeparatorKind = "road" | "river" | "park";

@@ -21,9 +21,13 @@ export interface BuildingWindow {
   litAt: number;
   hue: "warm" | "cool";
   isLetter?: boolean;
+  isZone?: boolean;
   isStorefront?: boolean;
   isHalo?: boolean;
-  brightness?: number; // 0.25 .. 0.55 untuk jendela redup
+  brightness?: number;
+  rawLitRand?: number;
+  rawBrightnessRand?: number;
+  rawColorIndex?: number;
 }
 
 export type Window = BuildingWindow;
@@ -49,6 +53,8 @@ export interface Building {
   roofKind?: RoofKind;
   gap?: number;
   hasDoor?: boolean;
+  cols?: number;
+  extraFloors?: number;
 }
 
 export type SeparatorKind = "road" | "river" | "park";

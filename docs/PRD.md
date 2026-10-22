@@ -72,7 +72,7 @@ Portofolio developer sering berisi project yang mirip (to-do list, e-commerce, d
 | FR-12 | Efek tambahan: kendaraan lewat, kereta, kembang api saat kata selesai | Could |
 | FR-13 | Suara ambient dan bunyi ketik halus (bisa dimatikan) | Could |
 | FR-14 | Dukungan prefers-reduced-motion | Should |
-| FR-15 | Huruf yang diketik harus terbaca pada fasad gedungnya (kriteria penerimaan: kata 5 huruf terbaca di desktop 1440 px dan HP 390 px) | Must |
+| FR-15 | Huruf yang diketik tampil sebagai jendela putih murni pada fasad gedung yang penuh jendela hidup (kriteria penerimaan: kata 5 huruf terbaca di desktop 1440 px dan HP 390 px tanpa kotak gelap) | Must |
 
 ### 2.7 Non-Functional Requirements
 
@@ -126,7 +126,7 @@ Portofolio developer sering berisi project yang mirip (to-do list, e-commerce, d
 
 Bentuk akhir ditentukan oleh **seed** dari kombinasi karakter dan urutannya, sehingga kata yang sama selalu menghasilkan kota yang sama. Ini membuat hasilnya bisa dibagikan dan mudah diuji.
 
-Selain tipe gedung di atas, setiap karakter yang diketik ditampilkan secara terbaca pada fasad gedung melalui font piksel 5x7 yang dibentuk oleh jendela yang menyala hangat. Jendela di sekitar zona huruf dipadamkan agar teks kontras dan terbaca jelas baik di desktop maupun mobile.
+Selain tipe gedung di atas, setiap karakter yang diketik ditampilkan secara terbaca pada fasad gedung melalui font piksel 5x7 yang dibentuk oleh jendela putih murni (`#ffffff`). Seluruh fasad tetap penuh jendela menyala (~80% warna hangat dan biru) pada satu grid persegi seragam (11 px), sedangkan jendela di zona huruf dan halo sekelilingnya sedikit lebih redup agar huruf putih tetap kontras tanpa memerlukan panel LED atau kotak gelap.
 
 ### 3.3 Palet Warna (contoh)
 

@@ -14,6 +14,7 @@ import { generateStars } from "@/lib/render/stars";
 import { createParallaxRenderer } from "@/lib/render/parallax";
 import { renderScene } from "@/lib/render/pipeline";
 import HiddenInput from "@/components/HiddenInput";
+import TuningPanel from "@/components/TuningPanel";
 
 function subscribeToLocation(callback: () => void) {
   window.addEventListener("popstate", callback);
@@ -243,6 +244,7 @@ export default function CityCanvas() {
         aria-label="Night City Typer interactive canvas"
       />
       <HiddenInput onAction={handleAction} onFocusChange={setFocusDebugInfo} />
+      <TuningPanel />
       {isDebug && (
         <div className="fixed bottom-3 left-3 z-50 rounded bg-black/90 p-2.5 font-mono text-xs text-emerald-400 border border-emerald-800 pointer-events-none select-none max-w-sm space-y-1">
           <div>Aksi: {debugAction || "(belum ada)"}</div>

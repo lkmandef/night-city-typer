@@ -49,11 +49,11 @@ describe("Buildings & Generator (Fase 3)", () => {
     expect(capital.height).toBeGreaterThan(small.height * 1.1);
   });
 
-  it("lebar gedung selalu dalam rentang 36 sampai 76 px", () => {
+  it("lebar gedung selalu dalam rentang 36 sampai 100 px", () => {
     for (let i = 0; i < 50; i++) {
       const b = makeBuilding(String.fromCharCode(65 + (i % 26)), i, i * 40, 12345);
       expect(b.width).toBeGreaterThanOrEqual(36);
-      expect(b.width).toBeLessThanOrEqual(76);
+      expect(b.width).toBeLessThanOrEqual(100);
     }
   });
 

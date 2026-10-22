@@ -1,14 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { getGlyph, GLYPHS } from "@/lib/city/glyphs";
 import {
+  CELL,
   LETTER_BASELINE,
   LETTER_CELL,
   LETTER_MAX_GAP,
   LETTER_MIN_GAP,
   makeBuilding,
+  PODIUM_ROWS,
   updateBuilding,
 } from "@/lib/city/buildings";
 import { cityReducer, createInitialCityState } from "@/lib/city/reducer";
+import TuningPanel, { isTuneRequested } from "@/components/TuningPanel";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 describe("Font Piksel 5x7 & Fasad Hidup (FR-15)", () => {
   it("glyph H, A, L, O berbentuk benar sesuai matriks 5x7", () => {
@@ -78,11 +83,15 @@ describe("Font Piksel 5x7 & Fasad Hidup (FR-15)", () => {
       expect(b.glyph).toBeDefined();
       expect(b.glyph).toEqual(glyph);
 
-      // Zona huruf berada pada lantai f = 5..11 (y = 60 px s/d 126 px)
+      const cols = b.cols ?? 5;
+      const startCol = Math.floor((cols - 5) / 2);
+
+      // Zona huruf berada pada lantai f = 5..11 (y = 55 px s/d 132 px)
       for (let f = 5; f <= 11; f++) {
-        const glyphRow = 11 - f; // f = 11 adalah baris atas glyph (0), f = 5 adalah baris bawah glyph (6)
+        const glyphRow = 11 - f; // f = 11 baris atas (0), f = 5 baris bawah (6)
         for (let c = 0; c < 5; c++) {
-          const win = b.windows.find((w) => w.col === c && w.row === f);
+          const col = startCol + c;
+          const win = b.windows.find((w) => w.col === col && w.row === f);
           expect(win).toBeDefined();
           if (!win || !glyph) continue;
 
@@ -91,12 +100,46 @@ describe("Font Piksel 5x7 & Fasad Hidup (FR-15)", () => {
           if (shouldBeLitPixel) {
             expect(win.isLetter).toBe(true);
             expect(win.hue).toBe("warm");
-            expect(win.litAt).toBeGreaterThanOrEqual(0);
           } else {
-            // Jendela dalam zona huruf yang bukan bagian huruf padam total
+            // Jendela dalam zona huruf yang bukan bagian huruf adalah isZone = true (redup)
             expect(win.isLetter).toBe(false);
-            expect(win.litAt).toBe(-1);
+            expect(win.isZone).toBe(true);
           }
+        }
+      }
+    }
+  });
+
+  it("semua jendela di satu gedung memakai ukuran sel sama dan huruf selalu bagian dari grid", () => {
+    const sampleChars = ["W", "M", "E", "3", "7", "x"];
+
+    for (let i = 0; i < sampleChars.length; i++) {
+      const char = sampleChars[i];
+      const b = makeBuilding(char, i, i * 80, 54321);
+      const cols = b.cols ?? 5;
+      const startCol = Math.floor((cols - 5) / 2);
+
+      // 1. Seluruh gedung berhuruf memiliki letterCell = 11 px
+      expect(b.letterCell).toBe(CELL);
+      expect(b.letterCell).toBe(11);
+
+      // 2. Setiap jendela memiliki koordinat baris dan kolom bilangan bulat
+      const coordinateSet = new Set<string>();
+      for (const win of b.windows) {
+        expect(win.col).toBeGreaterThanOrEqual(0);
+        expect(win.col).toBeLessThan(cols);
+        expect(win.row).toBeGreaterThanOrEqual(0);
+
+        const key = `${win.col},${win.row}`;
+        expect(coordinateSet.has(key)).toBe(false); // Tidak ada jendela tumpang tindih
+        coordinateSet.add(key);
+
+        // 3. Huruf selalu bagian dari grid di zona huruf 5x7
+        if (win.isLetter) {
+          expect(win.row).toBeGreaterThanOrEqual(PODIUM_ROWS);
+          expect(win.row).toBeLessThan(PODIUM_ROWS + 7);
+          expect(win.col).toBeGreaterThanOrEqual(startCol);
+          expect(win.col).toBeLessThan(startCol + 5);
         }
       }
     }
@@ -109,22 +152,22 @@ describe("Font Piksel 5x7 & Fasad Hidup (FR-15)", () => {
       const char = sampleChars[i];
       const b = makeBuilding(char, i, i * 80, 12345);
 
-      // 1. Garis dasar seragam di LETTER_BASELINE (60 px dari tanah)
+      // 1. Garis dasar seragam di LETTER_BASELINE (55 px dari tanah = PODIUM_ROWS * CELL)
       expect(b.letterBaseline).toBe(LETTER_BASELINE);
-      expect(b.letterBaseline).toBe(60);
+      expect(b.letterBaseline).toBe(55);
 
-      // 2. Sel zona huruf persegi berukuran LETTER_CELL (11 px)
-      expect(b.letterCell).toBe(LETTER_CELL);
+      // 2. Sel zona huruf persegi berukuran CELL (11 px)
+      expect(b.letterCell).toBe(CELL);
       expect(b.letterCell).toBe(11);
 
       // 3. Tinggi minimum gedung mencakup baseline + 7 cell + lantai ekstra
       expect(b.height).toBeGreaterThanOrEqual(150);
 
-      // 4. Lebar gedung berhuruf berkisar 5 * LETTER_CELL + 2 * margin ± 10% (60..74 px)
-      expect(b.width).toBeGreaterThanOrEqual(60);
-      expect(b.width).toBeLessThanOrEqual(75);
+      // 4. Lebar gedung berhuruf adalah kelipatan sel dengan kolom ganjil (5, 7, atau 9 kolom)
+      expect([55, 77, 99]).toContain(b.width);
+      expect([5, 7, 9]).toContain(b.cols);
 
-      // 5. Celah antar gedung berada dalam rentang nyaman (4 sampai 10 px)
+      // 5. Celah antar gedung berada dalam rentang nyaman (4 sampai 8 px)
       expect(b.gap).toBeGreaterThanOrEqual(LETTER_MIN_GAP);
       expect(b.gap).toBeLessThanOrEqual(LETTER_MAX_GAP);
 
@@ -158,20 +201,20 @@ describe("Font Piksel 5x7 & Fasad Hidup (FR-15)", () => {
       }
     }
 
-    // Seluruh gedung memiliki baseline 60 px
-    expect(baselines).toEqual([60, 60, 60, 60]);
+    // Seluruh gedung memiliki baseline 55 px
+    expect(baselines).toEqual([55, 55, 55, 55]);
     // Seluruh gedung memiliki ukuran sel persegi 11 px
     expect(cellSizes).toEqual([11, 11, 11, 11]);
-    // Ketinggian puncak huruf pada keempat gedung sejajar persis pada y = 137 px
-    expect(topOfLetters).toEqual([137, 137, 137, 137]);
+    // Ketinggian puncak huruf pada keempat gedung sejajar persis pada y = 132 px (55 + 77)
+    expect(topOfLetters).toEqual([132, 132, 132, 132]);
 
-    // Celah antar gedung berurutan berada dalam rentang serasi (4 sampai 10 px)
+    // Celah antar gedung berurutan berada dalam rentang serasi (4 sampai 8 px)
     for (let i = 0; i < state.items.length - 1; i++) {
       const current = state.items[i];
       const next = state.items[i + 1];
       const gap = next.x - (current.x + current.width);
       expect(gap).toBeGreaterThanOrEqual(4);
-      expect(gap).toBeLessThanOrEqual(10);
+      expect(gap).toBeLessThanOrEqual(8);
       if ("gap" in current && current.gap !== undefined) {
         expect(gap).toBe(current.gap);
       }
@@ -191,6 +234,7 @@ describe("Font Piksel 5x7 & Fasad Hidup (FR-15)", () => {
     expect(b1.letterCell).toBe(b2.letterCell);
     expect(b1.roofKind).toBe(b2.roofKind);
     expect(b1.gap).toBe(b2.gap);
+    expect(b1.cols).toBe(b2.cols);
   });
 
   it("huruf menyala setelah gedung selesai tumbuh dan padam seketika saat backspace (collapsing)", () => {
@@ -222,5 +266,21 @@ describe("Font Piksel 5x7 & Fasad Hidup (FR-15)", () => {
     const letterWindowsAfterCollapse = b.windows.filter((w) => w.isLetter && w.lit);
     expect(letterWindowsAfterCollapse.length).toBe(0); // Huruf langsung padam seketika
     expect(b.collapse).toBe(0); // Badan gedung belum runtuh (jeda 150ms)
+  });
+
+  it("panel penyetel tidak dirender tanpa ?tune=1 dan aktif saat ?tune=1", () => {
+    // 1. Verifikasi deteksi query parameter URL
+    expect(isTuneRequested("")).toBe(false);
+    expect(isTuneRequested("?debug=1")).toBe(false);
+    expect(isTuneRequested("?tune=0")).toBe(false);
+    expect(isTuneRequested("?tune=1")).toBe(true);
+    expect(isTuneRequested("?foo=bar&tune=1")).toBe(true);
+
+    // 2. Render komponen TuningPanel tanpa ?tune=1 menghasilkan markup kosong (null)
+    if (typeof window !== "undefined") {
+      window.location.search = "";
+    }
+    const htmlWithoutTune = renderToStaticMarkup(React.createElement(TuningPanel));
+    expect(htmlWithoutTune).toBe("");
   });
 });

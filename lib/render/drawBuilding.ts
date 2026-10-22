@@ -1,20 +1,19 @@
 import type { Building } from "@/lib/city/types";
 import { easeOutCubic } from "@/lib/utils/easing";
-import { LETTER_BASELINE, LETTER_CELL } from "@/lib/city/buildings";
+import { currentConfig } from "@/lib/city/config";
+import { CELL, PODIUM_ROWS } from "@/lib/city/buildings";
 
 // ==========================================
 // Konstanta Visual Zona Huruf & Jendela
 // ==========================================
-export const LETTER_COLOR = "#fff3c4"; // Warna huruf paling terang di fasad
-export const LETTER_GLOW_OPACITY = 0.18; // Opacity radial glow per huruf (~0.18)
+export const LETTER_COLOR = "#ffffff"; // Warna huruf putih murni di fasad
+export const LETTER_GLOW_OPACITY = 0.22; // Opacity radial glow per huruf (~0.22)
 export const LETTER_GLOW_RADIUS_MULT = 1.6; // Ukuran glow relatif terhadap tinggi huruf (1.6x)
-export const STOREFRONT_COLOR = "#ffe8a8"; // Warna jendela toko di lantai podium
-export const DIM_WARM_COLOR = "rgba(255, 180, 84, "; // Warna jendela biasa hangat redup (kecerahan 0.25..0.55)
-export const DIM_COOL_COLOR = "rgba(95, 184, 230, "; // Warna jendela biasa dingin redup (~10%)
 
 /**
- * Menggambar satu gedung dengan animasi tumbuh, grid jendela fasad hidup,
- * huruf sebagai jendela paling terang, ruang napas halo, variasi siluet atap, dan debu runtuh.
+ * Menggambar satu gedung dengan animasi tumbuh, fasad penuh jendela hidup,
+ * huruf sebagai jendela putih murni di grid fasad, glow putih kebiruan lembut,
+ * variasi siluet atap, dan debu runtuh.
  */
 export function drawBuilding(
   ctx: CanvasRenderingContext2D,
@@ -50,30 +49,37 @@ export function drawBuilding(
   }
 
   // 1. Glow lembut per huruf (satu radial gradient berukuran ~1.6x tinggi huruf)
-  // Digambar di bawah piksel huruf dan sedikit menerangi dinding/udara sekitar
+  // Berwarna putih kebiruan rgba(210, 230, 255, 0.22), digambar di bawah piksel huruf
   const hasLitLetters = building.windows.some((w) => w.isLetter && w.lit);
   if (building.glyph && hasLitLetters && building.state !== "collapsing") {
-    const letterHeight = 7 * LETTER_CELL; // 77 px
-    const glowCenterX = Math.round(drawX + building.width / 2);
-    const glowCenterY = Math.round(groundY - (LETTER_BASELINE + 3.5 * LETTER_CELL));
-    const glowRadius = Math.round((letterHeight * LETTER_GLOW_RADIUS_MULT) / 2); // ~62 px
+    const letterHeight = 7 * CELL; // 77 px
+    const startCol = Math.floor(((building.cols ?? 5) - 5) / 2);
+    const glowCenterX = Math.round(drawX + (startCol + 2.5) * CELL);
+    const glowCenterY = Math.round(groundY - (PODIUM_ROWS * CELL + 3.5 * CELL));
+    const glowRadius = Math.round((letterHeight * currentConfig.LETTER_GLOW_RADIUS_MULT) / 2); // ~62 px
 
     const glowFade = Math.min(1, building.grow);
+
+    // Kilatan glow singkat (~300 ms) saat huruf pertama kali menyala
+    const letterTimer = building.letterTimer ?? 0;
+    const flash = letterTimer < 300 ? 1 + 1.2 * (1 - letterTimer / 300) : 1;
+
+    const baseOpacity = currentConfig.LETTER_GLOW_OPACITY * flash * glowFade;
 
     const letterGlow = ctx.createRadialGradient(
       glowCenterX,
       glowCenterY,
-      8,
+      6,
       glowCenterX,
       glowCenterY,
       glowRadius
     );
-    letterGlow.addColorStop(0, `rgba(255, 238, 175, ${LETTER_GLOW_OPACITY * glowFade})`);
+    letterGlow.addColorStop(0, `rgba(210, 230, 255, ${Math.min(1, baseOpacity * 1.2)})`);
     letterGlow.addColorStop(
       0.5,
-      `rgba(255, 205, 110, ${LETTER_GLOW_OPACITY * 0.4 * glowFade})`
+      `rgba(180, 215, 255, ${Math.min(1, baseOpacity * 0.45)})`
     );
-    letterGlow.addColorStop(1, "rgba(255, 190, 80, 0)");
+    letterGlow.addColorStop(1, "rgba(160, 200, 255, 0)");
 
     ctx.fillStyle = letterGlow;
     ctx.fillRect(
@@ -122,13 +128,14 @@ export function drawBuilding(
 
   // 3. Pintu toko di lantai podium dasar (ground level)
   if (building.glyph && building.hasDoor) {
-    const letterStartX = drawX + Math.round((building.width - 5 * LETTER_CELL) / 2);
-    const doorX = letterStartX + 2 * LETTER_CELL + 1;
+    const cols = building.cols ?? 5;
+    const doorCol = Math.floor(cols / 2);
+    const doorX = drawX + doorCol * CELL + 1;
     const doorY = groundY - 14;
     if (topY <= doorY) {
       ctx.fillStyle = "#161d31";
       ctx.fillRect(doorX, doorY, 9, 14);
-      ctx.fillStyle = "rgba(255, 230, 160, 0.75)";
+      ctx.fillStyle = "rgba(255, 230, 160, 0.85)";
       ctx.fillRect(doorX + 1.5, doorY + 2, 6, 12);
     }
   }
@@ -150,81 +157,127 @@ export function drawBuilding(
     // -------------------------------------------------------------------------
     // A. Gedung Berhuruf: SATU grid terpadu dari podium sampai atap
     // -------------------------------------------------------------------------
-    const letterStartX = drawX + Math.round((building.width - 5 * LETTER_CELL) / 2);
-
     const litLetterRects: Rect[] = [];
-    const storefrontRects: Rect[] = [];
-    const dimWarmRects: { rect: Rect; alpha: number }[] = [];
-    const dimCoolRects: { rect: Rect; alpha: number }[] = [];
+    const litColoredWindows: { rect: Rect; color: string }[] = [];
     const unlitRects: Rect[] = [];
 
+    const cellW = CELL;
+
     for (const win of building.windows) {
-      const cellX = letterStartX + win.col * LETTER_CELL;
-      const cellY = Math.round(groundY - (5 + win.row * LETTER_CELL + 8));
+      const cellX = drawX + win.col * cellW;
+      const cellY = Math.round(groundY - (win.row + 1) * cellW);
 
       if (cellY < topY + 1) continue; // Belum tumbuh mencapai jendela ini
 
       if (win.isLetter) {
         if (win.lit) {
-          // Piksel huruf: warna paling terang (#fff3c4) dan sedikit lebih besar (9x9 px)
+          // Piksel huruf: warna putih murni (#ffffff) dan sedikit lebih besar (10x10 px, gap 1 px)
           litLetterRects.push({
-            x: cellX + 1,
-            y: cellY - 0.5,
-            w: 9,
-            h: 9,
+            x: cellX + 0.5,
+            y: cellY + 0.5,
+            w: 10,
+            h: 10,
           });
-        }
-        // Jendela dalam zona huruf yang bukan bagian huruf: padam total
-      } else if (win.isStorefront) {
-        if (win.lit) {
-          storefrontRects.push({
-            x: cellX + 1.5,
-            y: cellY,
-            w: 8,
-            h: 8,
-          });
-        } else {
-          unlitRects.push({ x: cellX + 1.5, y: cellY, w: 8, h: 8 });
-        }
-      } else if (win.lit) {
-        const alpha = win.brightness ?? (win.isHalo ? 0.25 : 0.38);
-        const rect = { x: cellX + 1.8, y: cellY + 0.3, w: 7.4, h: 7.4 };
-        if (win.hue === "cool") {
-          dimCoolRects.push({ rect, alpha });
-        } else {
-          dimWarmRects.push({ rect, alpha });
         }
       } else {
-        // Jendela padam digambar sangat samar (alpha 0.04)
-        unlitRects.push({ x: cellX + 1.8, y: cellY + 0.3, w: 7.4, h: 7.4 });
+        const regularRect: Rect = {
+          x: cellX + 1,
+          y: cellY + 1,
+          w: 9,
+          h: 9,
+        };
+
+        if (!win.lit) {
+          // Jendela belum menyala selama animasi tumbuh: gambar samar
+          unlitRects.push(regularRect);
+        } else {
+          // Evaluasi status menyala dinamis berdasarkan config saat ini
+          const litThreshold = win.isZone
+            ? currentConfig.ZONE_LIT_RATIO
+            : win.isStorefront
+            ? 0.85
+            : currentConfig.OTHER_LIT_RATIO;
+
+          const isLit = (win.rawLitRand ?? 0) < litThreshold;
+
+          if (!isLit) {
+            unlitRects.push(regularRect);
+          } else {
+            // Hitung kecerahan
+            let b: number;
+            if (win.isZone) {
+              b =
+                currentConfig.ZONE_BRIGHTNESS_MIN +
+                (win.rawBrightnessRand ?? 0.5) *
+                  (currentConfig.ZONE_BRIGHTNESS_MAX - currentConfig.ZONE_BRIGHTNESS_MIN);
+            } else {
+              b =
+                currentConfig.BG_BRIGHTNESS_MIN +
+                (win.rawBrightnessRand ?? 0.5) *
+                  (currentConfig.BG_BRIGHTNESS_MAX - currentConfig.BG_BRIGHTNESS_MIN);
+            }
+            if (win.isHalo) {
+              b *= currentConfig.HALO_BRIGHTNESS;
+            }
+            if (win.isStorefront) {
+              b = Math.min(1.0, b * 1.25);
+            }
+
+            // Hitung warna: 65% hangat (amber, oranye, emas), 30% dingin (biru), 5% aksen (teal/magenta)
+            const coolRatio = currentConfig.COOL_COLOR_RATIO;
+            const accentRatio = currentConfig.ACCENT_COLOR_RATIO;
+            const warmLimit = Math.max(0, 1 - (coolRatio + accentRatio));
+            const rawColor = win.rawColorIndex ?? 0;
+
+            let rgb: [number, number, number];
+            if (rawColor < warmLimit) {
+              const sub = rawColor / (warmLimit || 1);
+              if (sub < 0.45) {
+                rgb = [242, 169, 59]; // amber #f2a93b
+              } else if (sub < 0.75) {
+                rgb = [232, 137, 58]; // oranye #e8893a
+              } else {
+                rgb = [255, 199, 102]; // emas lembut #ffc766
+              }
+            } else if (rawColor < 1 - accentRatio) {
+              const sub = (rawColor - warmLimit) / (coolRatio || 1);
+              if (sub < 0.5) {
+                rgb = [63, 143, 208]; // biru #3f8fd0
+              } else {
+                rgb = [47, 111, 176]; // biru #2f6fb0
+              }
+            } else {
+              const sub = (rawColor - (1 - accentRatio)) / (accentRatio || 1);
+              if (sub < 0.5) {
+                rgb = [45, 212, 191]; // teal #2dd4bf
+              } else {
+                rgb = [192, 38, 211]; // magenta redup #c026d3
+              }
+            }
+
+            litColoredWindows.push({
+              rect: regularRect,
+              color: `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${b.toFixed(3)})`,
+            });
+          }
+        }
       }
     }
 
-    // 1. Jendela padam samar
+    // 1. Jendela padam samar (alpha 0.05)
     if (unlitRects.length > 0) {
-      fillRects(unlitRects, "rgba(40, 55, 90, 0.04)");
+      fillRects(unlitRects, "rgba(40, 55, 90, 0.05)");
     }
 
-    // 2. Jendela toko podium
-    if (storefrontRects.length > 0) {
-      fillRects(storefrontRects, STOREFRONT_COLOR);
-    }
-
-    // 3. Jendela biasa hangat redup (kecerahan 0.25..0.55)
-    for (const item of dimWarmRects) {
-      ctx.fillStyle = `${DIM_WARM_COLOR}${item.alpha})`;
+    // 2. Jendela beranimasi warna-warni hidup
+    for (const item of litColoredWindows) {
+      ctx.fillStyle = item.color;
       ctx.fillRect(item.rect.x, item.rect.y, item.rect.w, item.rect.h);
     }
 
-    // 4. Jendela biasa dingin redup (~10%)
-    for (const item of dimCoolRects) {
-      ctx.fillStyle = `${DIM_COOL_COLOR}${item.alpha})`;
-      ctx.fillRect(item.rect.x, item.rect.y, item.rect.w, item.rect.h);
-    }
-
-    // 5. Piksel huruf menyala: paling terang di fasad (#fff3c4)
+    // 3. Piksel huruf menyala: jendela putih murni (#ffffff)
     if (litLetterRects.length > 0) {
-      fillRects(litLetterRects, LETTER_COLOR);
+      fillRects(litLetterRects, currentConfig.LETTER_COLOR);
     }
   } else if (building.windows.length > 0) {
     // -------------------------------------------------------------------------
@@ -251,16 +304,20 @@ export function drawBuilding(
     const coolBright: Rect[] = [];
     const coolMid: Rect[] = [];
     const coolDim: Rect[] = [];
+    const unlitProc: Rect[] = [];
 
     for (const win of building.windows) {
-      if (!win.lit) continue;
-
       const winX = Math.round(drawX + padX + win.col * stepX);
       const winYFromBottom = padY + win.row * stepY;
       const winY = Math.round(groundY - winYFromBottom - winH);
 
       if (winY >= topY + 2) {
         const rect = { x: winX, y: winY, w: winW, h: winH };
+        if (!win.lit) {
+          unlitProc.push(rect);
+          continue;
+        }
+
         const raw =
           Math.sin(win.col * 12.9898 + win.row * 78.233 + building.id * 37.719) * 43758.5453;
         const norm = Math.abs(raw - Math.floor(raw));
@@ -283,6 +340,10 @@ export function drawBuilding(
           }
         }
       }
+    }
+
+    if (unlitProc.length > 0) {
+      fillRects(unlitProc, "rgba(40, 55, 90, 0.05)");
     }
 
     fillRects(warmBright, "#ffd27a");

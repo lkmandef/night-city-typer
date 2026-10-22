@@ -1,8 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { CityAction } from "@/lib/city/types";
+import type { Building, CityAction, CityState } from "@/lib/city/types";
+import { cityReducer, createInitialCityState } from "@/lib/city/reducer";
+import { updateCity } from "@/lib/city/buildings";
 import { drawGround, drawSky } from "@/lib/render/sky";
+import { drawBuildings } from "@/lib/render/drawBuilding";
 import HiddenInput from "@/components/HiddenInput";
 
 function subscribeToLocation(callback: () => void) {
@@ -21,8 +24,10 @@ function getDebugServerSnapshot() {
 export default function CityCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sizeRef = useRef({ width: 0, height: 0, dpr: 1 });
+  const cityStateRef = useRef<CityState>(createInitialCityState());
   const [debugAction, setDebugAction] = useState<string | null>(null);
   const [focusDebugInfo, setFocusDebugInfo] = useState<string>("Belum ada event fokus");
+  const [buildingCount, setBuildingCount] = useState<number>(0);
 
   // Langganan ke URL query ?debug=1 menggunakan useSyncExternalStore
   const isDebug = useSyncExternalStore(
@@ -55,10 +60,15 @@ export default function CityCanvas() {
 
       lastActionRef.current = { key: actionKey, source, time: now };
 
+      // Perbarui state kota di ref (tanpa re-render React)
+      const nextState = cityReducer(cityStateRef.current, action);
+      cityStateRef.current = nextState;
+
       // Log aksi di console
       console.log(`[CityInput] (${source})`, action);
 
       if (isDebug) {
+        setBuildingCount(nextState.items.length);
         setDebugAction(
           `${action.type}${action.type === "TYPE_CHAR" ? ` ('${action.char}')` : ""} [${source}]`
         );
@@ -118,17 +128,36 @@ export default function CityCanvas() {
       ctx.scale(dpr, dpr);
 
       sizeRef.current = { width, height, dpr };
+
+      // Set titik awal cursorX jika kota masih kosong
+      if (cityStateRef.current.items.length === 0) {
+        cityStateRef.current.cursorX = Math.max(40, Math.round(width * 0.1));
+      }
     };
 
     const loop = (currentTime: number) => {
-      const _dt = Math.min(50, currentTime - lastTime);
-      void _dt;
+      const dt = Math.min(50, currentTime - lastTime);
       lastTime = currentTime;
+
+      // Update animasi tumbuh dan jendela menyala
+      updateCity(cityStateRef.current, dt);
 
       const { width, height } = sizeRef.current;
       if (width > 0 && height > 0) {
+        const groundY = height * 0.85;
+
         ctx.clearRect(0, 0, width, height);
+
+        // 1. Gambar latar langit
         drawSky(ctx, width, height);
+
+        // 2. Gambar gedung yang tumbuh
+        const buildings = cityStateRef.current.items.filter(
+          (item): item is Building => "windows" in item
+        );
+        drawBuildings(ctx, buildings, groundY, currentTime);
+
+        // 3. Gambar dasar tanah
         drawGround(ctx, width, height);
       }
 
@@ -157,6 +186,7 @@ export default function CityCanvas() {
         <div className="fixed bottom-3 left-3 z-50 rounded bg-black/90 p-2.5 font-mono text-xs text-emerald-400 border border-emerald-800 pointer-events-none select-none max-w-sm space-y-1">
           <div>Aksi: {debugAction || "(belum ada)"}</div>
           <div>Fokus: {focusDebugInfo}</div>
+          <div>Gedung: {buildingCount}</div>
           <div>
             ActiveElement:{" "}
             {typeof document !== "undefined"

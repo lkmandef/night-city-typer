@@ -20,6 +20,8 @@ export interface BuildingWindow {
   hue: "warm" | "cool";
 }
 
+export type Window = BuildingWindow;
+
 export interface Building {
   id: number;
   char: string;
@@ -31,6 +33,7 @@ export interface Building {
   windows: BuildingWindow[];
   state: "growing" | "alive" | "collapsing";
   collapse: number;
+  lightTimer?: number;
 }
 
 export type SeparatorKind = "road" | "river" | "park";

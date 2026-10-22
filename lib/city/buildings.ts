@@ -3,6 +3,16 @@ import { mulberry32 } from "./rng";
 import { applySilhouetteCap } from "./camera";
 import { getGlyph } from "./glyphs";
 
+// ==========================================
+// Konstanta Zona Huruf & Tata Letak Fasad
+// ==========================================
+export const LETTER_BASELINE = 60; // Jarak dari tanah ke baris huruf paling bawah (px dunia sebelum worldScale)
+export const LETTER_CELL = 11; // Ukuran sel persegi (px dunia sebelum worldScale)
+export const LETTER_SIDE_MARGIN = 6; // Margin samping gedung berhuruf (px dunia)
+export const LETTER_ROOF_MARGIN = 22; // Margin atap di atas zona huruf (~2 sel = 22 px)
+export const LETTER_BUILDING_GAP = 6; // Celah antar gedung berhuruf bersebelahan (px dunia)
+export const LETTER_DIM_WINDOW_RATIO = 0.12; // Hanya ~12% jendela di luar zona huruf menyala
+
 /**
  * Menentukan tipe bangunan berdasarkan karakter:
  * - vokal (a, i, u, e, o) -> "tower"
@@ -24,8 +34,8 @@ export function isUpper(char: string): boolean {
 
 /**
  * Membuat satu instance Building secara deterministik berdasarkan seed.
- * Jika karakter memiliki glyph piksel 5x7, fasad atas gedung akan dialokasikan
- * sebagai zona huruf dengan grid jendela minimal 5 kolom dan 9 baris.
+ * Untuk karakter berhuruf/ber-glyph, garis dasar huruf berada pada LETTER_BASELINE
+ * yang seragam di seluruh gedung, dengan ukuran sel persegi LETTER_CELL.
  */
 export function makeBuilding(
   char: string,
@@ -41,39 +51,37 @@ export function makeBuilding(
   const kind = pickKind(char);
   const glyph = getGlyph(char);
 
-  // Lebar: 36..76 px. Untuk karakter ber-glyph minimal 52 px agar muat 5 kolom jendela
-  const randWidth = rand();
-  const minWidth = glyph ? 52 : 36;
-  const width = Math.round(minWidth + randWidth * (76 - minWidth));
+  let width: number;
+  let height: number;
 
-  // Tinggi: tower 220, block 140, house 70, lamp 45.
-  // Untuk karakter ber-glyph, pastikan minimal cukup tinggi untuk 9 baris jendela (>= 120 px)
-  const randVariation = rand();
-  const variation = 0.7 + randVariation * 0.7; // 0.7..1.4
-  const heightMultiplier = isUpper(char) ? 1.3 : 1.0;
+  if (glyph) {
+    // 2. Lebar gedung berhuruf = 5*LETTER_CELL + 2*margin samping; variasi maksimal ±10%
+    const baseWidth = 5 * LETTER_CELL + 2 * LETTER_SIDE_MARGIN; // 67 px
+    const randW = rand();
+    width = Math.round(baseWidth * (0.95 + randW * 0.1)); // 64..70 px (±5% dari 67 px)
 
-  const baseHeight = glyph
-    ? (kind === "tower" ? 220 : kind === "block" ? 140 : 130)
-    : (kind === "tower" ? 220 : kind === "block" ? 140 : kind === "house" ? 70 : 45);
+    // 1. Tinggi minimum = LETTER_BASELINE + 7*LETTER_CELL + margin atap (22 px) = 159 px
+    const minHeight = LETTER_BASELINE + 7 * LETTER_CELL + LETTER_ROOF_MARGIN;
+    // Variasi tinggi hanya boleh menambah lantai DI ATAS zona huruf (jendela acak redup)
+    const extraFloors =
+      kind === "tower"
+        ? Math.round(50 + rand() * 50) // tower lebih tinggi
+        : kind === "block"
+        ? Math.round(rand() * 30)
+        : 0; // house/pendek
 
-  let height = Math.round(baseHeight * variation * heightMultiplier);
-  if (glyph && height < 120) {
-    height = 120;
+    const heightMultiplier = isUpper(char) ? 1.3 : 1.0;
+    height = Math.round((minHeight + extraFloors) * heightMultiplier);
+  } else {
+    // Karakter tanpa glyph (simbol atau tanda baca tanpa font piksel)
+    const minWidth = 36;
+    width = Math.round(minWidth + rand() * 40); // 36..76 px
+    const baseHeight =
+      kind === "tower" ? 220 : kind === "block" ? 140 : kind === "house" ? 70 : 45;
+    const variation = 0.7 + rand() * 0.7; // 0.7..1.4
+    const heightMultiplier = isUpper(char) ? 1.3 : 1.0;
+    height = Math.round(baseHeight * variation * heightMultiplier);
   }
-
-  // Grid jendela: minimal 5 kolom dan 9 baris jika karakter memiliki glyph
-  const cols = glyph
-    ? Math.max(5, Math.floor(width / 11))
-    : (kind === "lamp" ? 1 : Math.max(2, Math.floor(width / 14)));
-
-  const rows = glyph
-    ? Math.max(9, Math.floor(height / 13))
-    : (kind === "lamp" ? 1 : Math.max(2, Math.floor(height / 18)));
-
-  // Zona huruf: 7 baris jendela di bagian atas (di bawah atap margin 1 baris), 5 kolom di tengah
-  const colStart = Math.floor((cols - 5) / 2);
-  const letterRowTop = rows - 2; // baris atas glyph (margin 1 baris dari atap rows - 1)
-  const letterRowBottom = rows - 8; // baris bawah glyph
 
   // Buat grid jendela
   const windows: BuildingWindow[] = [];
@@ -81,23 +89,17 @@ export function makeBuilding(
   const letterWindows: BuildingWindow[] = [];
 
   let winIdx = 0;
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const inLetterZone =
-        glyph !== undefined &&
-        r >= letterRowBottom &&
-        r <= letterRowTop &&
-        c >= colStart &&
-        c < colStart + 5;
 
-      if (inLetterZone && glyph) {
-        const glyphRow = letterRowTop - r; // 0 di atas sampai 6 di bawah
-        const glyphCol = c - colStart; // 0 di kiri sampai 4 di kanan
-        const isLetterPixel = glyph[glyphRow][glyphCol] === "1";
+  if (glyph) {
+    // A. Zona huruf 5x7:
+    // row 0..6 (glyphRow 0 di atas sampai 6 di bawah), col 0..4 (kiri ke kanan)
+    for (let r = 0; r < 7; r++) {
+      for (let c = 0; c < 5; c++) {
+        const isLetterPixel = glyph[r][c] === "1";
 
         const win: BuildingWindow = {
           col: c,
-          row: r,
+          row: r, // 0 di atas, 6 di bawah
           lit: false,
           litAt: isLetterPixel ? 0 : -1,
           hue: "warm",
@@ -108,8 +110,75 @@ export function makeBuilding(
         if (isLetterPixel) {
           letterWindows.push(win);
         }
-      } else {
-        const stayDark = rand() < 0.15; // 15% dibiarkan padam natural
+        winIdx++;
+      }
+    }
+
+    // Urutkan jendela huruf menyala berurutan dari kiri ke kanan (kolom c, lalu baris r)
+    letterWindows.sort((a, b) => {
+      if (a.col !== b.col) return a.col - b.col;
+      return a.row - b.row;
+    });
+    letterWindows.forEach((win, idx) => {
+      win.litAt = idx * 30; // jeda 30 ms per jendela
+    });
+
+    // B. Jendela di luar zona huruf (bawah & atas):
+    // 1. Lantai bawah (di bawah LETTER_BASELINE = 60 px)
+    const lowerFloors = 2;
+    const colsOutside = 3;
+    for (let f = 0; f < lowerFloors; f++) {
+      for (let c = 0; c < colsOutside; c++) {
+        const stayDark = rand() > LETTER_DIM_WINDOW_RATIO; // hanya ~12% menyala
+        const win: BuildingWindow = {
+          col: c,
+          row: 10 + f, // penanda lantai bawah
+          lit: false,
+          litAt: 0,
+          hue: "warm",
+          isLetter: false,
+        };
+        windows.push(win);
+        regularWindowOrders.push({
+          index: winIdx,
+          order: rand(),
+          stayDark,
+        });
+        winIdx++;
+      }
+    }
+
+    // 2. Lantai atas (di atas zona huruf: > 137 px hingga height)
+    const extraHeight = height - (LETTER_BASELINE + 7 * LETTER_CELL + 10);
+    const upperFloors = Math.max(0, Math.floor(extraHeight / 16));
+    for (let f = 0; f < upperFloors; f++) {
+      for (let c = 0; c < colsOutside; c++) {
+        const stayDark = rand() > LETTER_DIM_WINDOW_RATIO; // hanya ~12% menyala
+        const win: BuildingWindow = {
+          col: c,
+          row: 30 + f, // penanda lantai atas
+          lit: false,
+          litAt: 0,
+          hue: "warm",
+          isLetter: false,
+        };
+        windows.push(win);
+        regularWindowOrders.push({
+          index: winIdx,
+          order: rand(),
+          stayDark,
+        });
+        winIdx++;
+      }
+    }
+  } else {
+    // Non-glyph building (misalnya lampu jalan)
+    const cols = kind === "lamp" ? 1 : Math.max(2, Math.floor(width / 14));
+    const rows = kind === "lamp" ? 1 : Math.max(2, Math.floor(height / 18));
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const stayDark = rand() < 0.15;
         const hue = rand() > 0.25 ? "warm" : "cool";
 
         const win: BuildingWindow = {
@@ -127,21 +196,12 @@ export function makeBuilding(
           order: rand(),
           stayDark,
         });
+        winIdx++;
       }
-      winIdx++;
     }
   }
 
-  // 1. Urutkan jendela huruf menyala berurutan dari kiri ke kanan (jeda 30 ms per jendela)
-  letterWindows.sort((a, b) => {
-    if (a.col !== b.col) return a.col - b.col;
-    return b.row - a.row; // dari atas ke bawah dalam kolom yang sama
-  });
-  letterWindows.forEach((win, idx) => {
-    win.litAt = idx * 30; // 30 ms jeda antar jendela
-  });
-
-  // 2. Atur urutan menyala bertahap untuk jendela reguler di luar zona huruf (jeda 30 - 120 ms)
+  // Atur urutan menyala bertahap untuk jendela reguler di luar zona huruf (jeda 30 - 120 ms)
   regularWindowOrders.sort((a, b) => a.order - b.order);
   let accumulatedDelay = 0;
   for (const item of regularWindowOrders) {
@@ -168,6 +228,8 @@ export function makeBuilding(
     collapseTimer: 0,
     letterTimer: 0,
     glyph,
+    letterBaseline: glyph ? LETTER_BASELINE : undefined,
+    letterCell: glyph ? LETTER_CELL : undefined,
   };
 }
 
@@ -284,7 +346,11 @@ export function updateCity(state: CityState, dt: number, initialCursorX = 60): v
       state.cursorX = initialCursorX;
     } else {
       const last = state.items[state.items.length - 1];
-      state.cursorX = last.x + last.width + ("windows" in last ? 4 : 0);
+      const gap =
+        "glyph" in last && last.glyph
+          ? LETTER_BUILDING_GAP
+          : ("windows" in last ? 4 : 0);
+      state.cursorX = last.x + last.width + gap;
     }
   }
 }

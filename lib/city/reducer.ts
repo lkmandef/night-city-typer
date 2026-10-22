@@ -1,5 +1,5 @@
 import type { CityAction, CityState, Separator, SeparatorKind } from "./types";
-import { makeBuilding } from "./buildings";
+import { LETTER_BUILDING_GAP, makeBuilding } from "./buildings";
 import { mulberry32 } from "./rng";
 
 /**
@@ -28,7 +28,8 @@ export function cityReducer(state: CityState, action: CityAction): CityState {
         state.cursorX,
         state.seed
       );
-      const nextCursorX = state.cursorX + building.width + 4;
+      const gap = building.glyph ? LETTER_BUILDING_GAP : 4;
+      const nextCursorX = state.cursorX + building.width + gap;
       return {
         ...state,
         items: [...state.items, building],

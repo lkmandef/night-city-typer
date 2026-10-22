@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isUpper, makeBuilding, pickKind, updateBuilding } from "@/lib/city/buildings";
+import {
+  isUpper,
+  LETTER_BUILDING_GAP,
+  makeBuilding,
+  pickKind,
+  updateBuilding,
+} from "@/lib/city/buildings";
 import { cityReducer, createInitialCityState } from "@/lib/city/reducer";
 import { easeOutCubic } from "@/lib/utils/easing";
 
@@ -86,7 +92,7 @@ describe("City Reducer (Fase 3)", () => {
     expect("windows" in building).toBe(true);
     if ("windows" in building) {
       expect(building.char).toBe("h");
-      expect(nextState.cursorX).toBe(startX + building.width + 4);
+      expect(nextState.cursorX).toBe(startX + building.width + LETTER_BUILDING_GAP);
     }
   });
 

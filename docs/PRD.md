@@ -72,7 +72,7 @@ Portofolio developer sering berisi project yang mirip (to-do list, e-commerce, d
 | FR-12 | Efek tambahan: kendaraan lewat, kereta, kembang api saat kata selesai | Could |
 | FR-13 | Suara ambient dan bunyi ketik halus (bisa dimatikan) | Could |
 | FR-14 | Dukungan prefers-reduced-motion | Should |
-| FR-15 | Huruf yang diketik harus terbaca pada fasad gedungnya | Must |
+| FR-15 | Huruf yang diketik harus terbaca pada fasad gedungnya (kriteria penerimaan: kata 5 huruf terbaca di desktop 1440 px dan HP 390 px) | Must |
 
 ### 2.7 Non-Functional Requirements
 
@@ -97,6 +97,7 @@ Portofolio developer sering berisi project yang mirip (to-do list, e-commerce, d
 - Menekan backspace pada kota kosong tidak menimbulkan error.
 - Resize jendela tidak merusak tampilan atau menghapus kota.
 - Di HP, menyentuh layar memunculkan keyboard dan karakter yang diketik tampil sebagai gedung.
+- Kata 5 huruf terbaca di desktop (1440 px) dan HP (390 px).
 - Link yang dibagikan menampilkan gambar pratinjau dan judul yang benar.
 
 ## 3. Konsep Desain

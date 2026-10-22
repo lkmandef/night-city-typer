@@ -39,6 +39,8 @@ export interface Building {
   letterTimer?: number;
   isSilhouette?: boolean;
   glyph?: string[];
+  letterBaseline?: number;
+  letterCell?: number;
 }
 
 export type SeparatorKind = "road" | "river" | "park";

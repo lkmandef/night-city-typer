@@ -8,10 +8,15 @@ import { getGlyph } from "./glyphs";
 // ==========================================
 export const LETTER_BASELINE = 60; // Jarak dari tanah ke baris huruf paling bawah (px dunia sebelum worldScale)
 export const LETTER_CELL = 11; // Ukuran sel persegi (px dunia sebelum worldScale)
-export const LETTER_SIDE_MARGIN = 6; // Margin samping gedung berhuruf (px dunia)
-export const LETTER_ROOF_MARGIN = 22; // Margin atap di atas zona huruf (~2 sel = 22 px)
-export const LETTER_BUILDING_GAP = 6; // Celah antar gedung berhuruf bersebelahan (px dunia)
-export const LETTER_DIM_WINDOW_RATIO = 0.12; // Hanya ~12% jendela di luar zona huruf menyala
+export const LETTER_SIDE_MARGIN = 6; // Margin samping dasar gedung berhuruf (px dunia)
+export const LETTER_OTHER_LIT_RATIO = 0.4; // ~40% jendela di luar zona huruf menyala
+export const LETTER_HALO_LIT_RATIO = 0.12; // ~12% jendela di zona ruang napas (1 sel sekitar huruf)
+export const LETTER_MIN_EXTRA_FLOORS = 2; // Tambahan lantai minimum di atas zona huruf
+export const LETTER_MAX_EXTRA_FLOORS = 8; // Tambahan lantai maksimum di atas zona huruf
+export const LETTER_MIN_GAP = 4; // Celah minimum antar gedung berhuruf (px)
+export const LETTER_MAX_GAP = 10; // Celah maksimum antar gedung berhuruf (px)
+export const LETTER_BUILDING_GAP = 6; // Celah default referensi (px)
+export const LETTER_WIDTH_VARIATION = 0.1; // Variasi lebar gedung berhuruf (±10%)
 
 /**
  * Menentukan tipe bangunan berdasarkan karakter:
@@ -34,8 +39,9 @@ export function isUpper(char: string): boolean {
 
 /**
  * Membuat satu instance Building secara deterministik berdasarkan seed.
- * Untuk karakter berhuruf/ber-glyph, garis dasar huruf berada pada LETTER_BASELINE
- * yang seragam di seluruh gedung, dengan ukuran sel persegi LETTER_CELL.
+ * Fasad gedung memakai SATU grid jendela persegi (LETTER_CELL = 11 px) dari podium
+ * hingga atap. Huruf adalah jendela paling terang di fasad yang hidup, dengan zona
+ * ruang napas (halo) redup di sekelilingnya, podium toko di jalan, dan variasi atap.
  */
 export function makeBuilding(
   char: string,
@@ -53,37 +59,10 @@ export function makeBuilding(
 
   let width: number;
   let height: number;
+  let gap: number;
+  let roofKind: "flat" | "setback" | "watertank" | "antenna";
+  let hasDoor = false;
 
-  if (glyph) {
-    // 2. Lebar gedung berhuruf = 5*LETTER_CELL + 2*margin samping; variasi maksimal ±10%
-    const baseWidth = 5 * LETTER_CELL + 2 * LETTER_SIDE_MARGIN; // 67 px
-    const randW = rand();
-    width = Math.round(baseWidth * (0.95 + randW * 0.1)); // 64..70 px (±5% dari 67 px)
-
-    // 1. Tinggi minimum = LETTER_BASELINE + 7*LETTER_CELL + margin atap (22 px) = 159 px
-    const minHeight = LETTER_BASELINE + 7 * LETTER_CELL + LETTER_ROOF_MARGIN;
-    // Variasi tinggi hanya boleh menambah lantai DI ATAS zona huruf (jendela acak redup)
-    const extraFloors =
-      kind === "tower"
-        ? Math.round(50 + rand() * 50) // tower lebih tinggi
-        : kind === "block"
-        ? Math.round(rand() * 30)
-        : 0; // house/pendek
-
-    const heightMultiplier = isUpper(char) ? 1.3 : 1.0;
-    height = Math.round((minHeight + extraFloors) * heightMultiplier);
-  } else {
-    // Karakter tanpa glyph (simbol atau tanda baca tanpa font piksel)
-    const minWidth = 36;
-    width = Math.round(minWidth + rand() * 40); // 36..76 px
-    const baseHeight =
-      kind === "tower" ? 220 : kind === "block" ? 140 : kind === "house" ? 70 : 45;
-    const variation = 0.7 + rand() * 0.7; // 0.7..1.4
-    const heightMultiplier = isUpper(char) ? 1.3 : 1.0;
-    height = Math.round(baseHeight * variation * heightMultiplier);
-  }
-
-  // Buat grid jendela
   const windows: BuildingWindow[] = [];
   const regularWindowOrders: { index: number; order: number; stayDark: boolean }[] = [];
   const letterWindows: BuildingWindow[] = [];
@@ -91,88 +70,162 @@ export function makeBuilding(
   let winIdx = 0;
 
   if (glyph) {
-    // A. Zona huruf 5x7:
-    // row 0..6 (glyphRow 0 di atas sampai 6 di bawah), col 0..4 (kiri ke kanan)
-    for (let r = 0; r < 7; r++) {
+    // 1. Lebar gedung: 5*LETTER_CELL + 2*margin samping (67 px), variasi ±10% (60..74 px)
+    const baseWidth = 5 * LETTER_CELL + 2 * LETTER_SIDE_MARGIN;
+    const randW = rand();
+    width = Math.round(
+      baseWidth * (1 - LETTER_WIDTH_VARIATION + randW * (2 * LETTER_WIDTH_VARIATION))
+    );
+
+    // 2. Celah antar gedung bervariasi kecil: 4 sampai 10 px
+    gap = Math.round(LETTER_MIN_GAP + rand() * (LETTER_MAX_GAP - LETTER_MIN_GAP));
+
+    // 3. Tambahan lantai di atas zona huruf: acak 2 sampai 8 lantai (plus ekstra jika tower/vokal)
+    const extraFloorsRange = LETTER_MAX_EXTRA_FLOORS - LETTER_MIN_EXTRA_FLOORS;
+    let extraFloors = Math.round(LETTER_MIN_EXTRA_FLOORS + rand() * extraFloorsRange);
+    if (kind === "tower") {
+      extraFloors += Math.round(3 + rand() * 4); // Tower lebih tinggi
+    }
+
+    // Grid total lantai: 5 lantai bawah (0..4) + 7 lantai huruf (5..11) + 1 lantai halo atas (12) + ekstra
+    const totalFloors = 13 + extraFloors;
+    // Tinggi fisik gedung
+    height = Math.round(5 + totalFloors * LETTER_CELL + 6);
+    if (isUpper(char)) {
+      height = Math.round(height * 1.15);
+    }
+
+    // 4. Bentuk atap acak: flat, setback, watertank, antenna
+    const roofRand = rand();
+    if (kind === "tower") {
+      roofKind = "antenna";
+    } else if (roofRand < 0.3) {
+      roofKind = "flat";
+    } else if (roofRand < 0.6) {
+      roofKind = "setback";
+    } else if (roofRand < 0.85) {
+      roofKind = "watertank";
+    } else {
+      roofKind = "antenna";
+    }
+
+    // Pintu masuk toko di lantai dasar
+    hasDoor = rand() > 0.35;
+
+    // SATU grid jendela persegi dari lantai dasar hingga atap
+    for (let f = 0; f < totalFloors; f++) {
       for (let c = 0; c < 5; c++) {
-        const isLetterPixel = glyph[r][c] === "1";
+        // A. Zona Huruf 5x7 (lantai 5 sampai 11, dari y = 60 px sampai y = 126 px)
+        if (f >= 5 && f <= 11) {
+          const letterFloor = f - 5; // 0..6 dari bawah ke atas
+          const glyphRow = 6 - letterFloor; // 0 di atas, 6 di bawah
+          const isLetterPixel = glyph[glyphRow][c] === "1";
 
-        const win: BuildingWindow = {
-          col: c,
-          row: r, // 0 di atas, 6 di bawah
-          lit: false,
-          litAt: isLetterPixel ? 0 : -1,
-          hue: "warm",
-          isLetter: isLetterPixel,
-        };
+          const win: BuildingWindow = {
+            col: c,
+            row: f,
+            lit: false,
+            litAt: isLetterPixel ? 0 : -1, // dihitung nanti untuk yang isLetterPixel
+            hue: "warm",
+            isLetter: isLetterPixel,
+          };
 
-        windows.push(win);
-        if (isLetterPixel) {
-          letterWindows.push(win);
+          windows.push(win);
+          if (isLetterPixel) {
+            letterWindows.push(win);
+          }
         }
+        // B. Ruang Napas / Halo (lantai 4 tepat di bawah huruf, dan lantai 12 tepat di atas huruf)
+        else if (f === 4 || f === 12) {
+          const stayDark = rand() > LETTER_HALO_LIT_RATIO; // hanya ~12% menyala
+          const brightness = Math.round((0.18 + rand() * 0.12) * 100) / 100; // redup maksimal 0.30
+
+          const win: BuildingWindow = {
+            col: c,
+            row: f,
+            lit: false,
+            litAt: 0,
+            hue: "warm",
+            isLetter: false,
+            isHalo: true,
+            brightness,
+          };
+
+          windows.push(win);
+          regularWindowOrders.push({
+            index: winIdx,
+            order: rand(),
+            stayDark,
+          });
+        }
+        // C. Podium Toko di Dasar (lantai 0 dan 1: y = 5..26 px)
+        else if (f === 0 || f === 1) {
+          const stayDark = rand() > 0.75; // ~75% menyala hangat
+          const win: BuildingWindow = {
+            col: c,
+            row: f,
+            lit: false,
+            litAt: 0,
+            hue: "warm",
+            isLetter: false,
+            isStorefront: true,
+            brightness: 0.85,
+          };
+
+          windows.push(win);
+          regularWindowOrders.push({
+            index: winIdx,
+            order: rand(),
+            stayDark,
+          });
+        }
+        // D. Jendela Biasa Gedung (lantai 2-3 dan lantai atas >= 13)
+        else {
+          const stayDark = rand() > LETTER_OTHER_LIT_RATIO; // ~40% menyala
+          const isCool = rand() < 0.10; // ~10% warna dingin
+          const brightness = Math.round((0.25 + rand() * 0.30) * 100) / 100; // 0.25..0.55
+
+          const win: BuildingWindow = {
+            col: c,
+            row: f,
+            lit: false,
+            litAt: 0,
+            hue: isCool ? "cool" : "warm",
+            isLetter: false,
+            brightness,
+          };
+
+          windows.push(win);
+          regularWindowOrders.push({
+            index: winIdx,
+            order: rand(),
+            stayDark,
+          });
+        }
+
         winIdx++;
       }
     }
 
-    // Urutkan jendela huruf menyala berurutan dari kiri ke kanan (kolom c, lalu baris r)
+    // Urutkan jendela huruf menyala berurutan dari kiri ke kanan (kolom c, lalu baris dari atas ke bawah)
     letterWindows.sort((a, b) => {
       if (a.col !== b.col) return a.col - b.col;
-      return a.row - b.row;
+      return b.row - a.row;
     });
     letterWindows.forEach((win, idx) => {
-      win.litAt = idx * 30; // jeda 30 ms per jendela
+      win.litAt = idx * 30; // 30 ms jeda antar jendela huruf
     });
-
-    // B. Jendela di luar zona huruf (bawah & atas):
-    // 1. Lantai bawah (di bawah LETTER_BASELINE = 60 px)
-    const lowerFloors = 2;
-    const colsOutside = 3;
-    for (let f = 0; f < lowerFloors; f++) {
-      for (let c = 0; c < colsOutside; c++) {
-        const stayDark = rand() > LETTER_DIM_WINDOW_RATIO; // hanya ~12% menyala
-        const win: BuildingWindow = {
-          col: c,
-          row: 10 + f, // penanda lantai bawah
-          lit: false,
-          litAt: 0,
-          hue: "warm",
-          isLetter: false,
-        };
-        windows.push(win);
-        regularWindowOrders.push({
-          index: winIdx,
-          order: rand(),
-          stayDark,
-        });
-        winIdx++;
-      }
-    }
-
-    // 2. Lantai atas (di atas zona huruf: > 137 px hingga height)
-    const extraHeight = height - (LETTER_BASELINE + 7 * LETTER_CELL + 10);
-    const upperFloors = Math.max(0, Math.floor(extraHeight / 16));
-    for (let f = 0; f < upperFloors; f++) {
-      for (let c = 0; c < colsOutside; c++) {
-        const stayDark = rand() > LETTER_DIM_WINDOW_RATIO; // hanya ~12% menyala
-        const win: BuildingWindow = {
-          col: c,
-          row: 30 + f, // penanda lantai atas
-          lit: false,
-          litAt: 0,
-          hue: "warm",
-          isLetter: false,
-        };
-        windows.push(win);
-        regularWindowOrders.push({
-          index: winIdx,
-          order: rand(),
-          stayDark,
-        });
-        winIdx++;
-      }
-    }
   } else {
-    // Non-glyph building (misalnya lampu jalan)
+    // Non-glyph building (misalnya lampu jalan atau simbol)
+    width = Math.round(36 + rand() * 40);
+    gap = 4;
+    roofKind = kind === "tower" ? "antenna" : "flat";
+    const baseHeight =
+      kind === "tower" ? 220 : kind === "block" ? 140 : kind === "house" ? 70 : 45;
+    const variation = 0.7 + rand() * 0.7;
+    const heightMultiplier = isUpper(char) ? 1.3 : 1.0;
+    height = Math.round(baseHeight * variation * heightMultiplier);
+
     const cols = kind === "lamp" ? 1 : Math.max(2, Math.floor(width / 14));
     const rows = kind === "lamp" ? 1 : Math.max(2, Math.floor(height / 18));
 
@@ -201,7 +254,7 @@ export function makeBuilding(
     }
   }
 
-  // Atur urutan menyala bertahap untuk jendela reguler di luar zona huruf (jeda 30 - 120 ms)
+  // Atur urutan menyala bertahap untuk jendela non-huruf
   regularWindowOrders.sort((a, b) => a.order - b.order);
   let accumulatedDelay = 0;
   for (const item of regularWindowOrders) {
@@ -230,6 +283,9 @@ export function makeBuilding(
     glyph,
     letterBaseline: glyph ? LETTER_BASELINE : undefined,
     letterCell: glyph ? LETTER_CELL : undefined,
+    roofKind,
+    gap,
+    hasDoor,
   };
 }
 
@@ -347,7 +403,9 @@ export function updateCity(state: CityState, dt: number, initialCursorX = 60): v
     } else {
       const last = state.items[state.items.length - 1];
       const gap =
-        "glyph" in last && last.glyph
+        "gap" in last && last.gap !== undefined
+          ? last.gap
+          : "glyph" in last && last.glyph
           ? LETTER_BUILDING_GAP
           : ("windows" in last ? 4 : 0);
       state.cursorX = last.x + last.width + gap;

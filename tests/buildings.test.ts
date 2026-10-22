@@ -92,7 +92,9 @@ describe("City Reducer (Fase 3)", () => {
     expect("windows" in building).toBe(true);
     if ("windows" in building) {
       expect(building.char).toBe("h");
-      expect(nextState.cursorX).toBe(startX + building.width + LETTER_BUILDING_GAP);
+      expect(nextState.cursorX).toBe(
+        startX + building.width + (building.gap ?? LETTER_BUILDING_GAP)
+      );
     }
   });
 

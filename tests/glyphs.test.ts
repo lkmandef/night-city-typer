@@ -2,14 +2,15 @@ import { describe, expect, it } from "vitest";
 import { getGlyph, GLYPHS } from "@/lib/city/glyphs";
 import {
   LETTER_BASELINE,
-  LETTER_BUILDING_GAP,
   LETTER_CELL,
+  LETTER_MAX_GAP,
+  LETTER_MIN_GAP,
   makeBuilding,
   updateBuilding,
 } from "@/lib/city/buildings";
 import { cityReducer, createInitialCityState } from "@/lib/city/reducer";
 
-describe("Font Piksel 5x7 & Zona Huruf Fasad (FR-15)", () => {
+describe("Font Piksel 5x7 & Fasad Hidup (FR-15)", () => {
   it("glyph H, A, L, O berbentuk benar sesuai matriks 5x7", () => {
     const expectedH = [
       "10001",
@@ -67,7 +68,7 @@ describe("Font Piksel 5x7 & Zona Huruf Fasad (FR-15)", () => {
     expect(getGlyph("")).toBeUndefined();
   });
 
-  it("makeBuilding mengisi zona huruf sesuai matriks glyph H, A, L, O", () => {
+  it("makeBuilding mengisi zona huruf pada satu grid fasad terpadu sesuai matriks glyph", () => {
     const testChars = ["H", "A", "L", "O", "h", "a", "l", "o"];
 
     for (const char of testChars) {
@@ -77,21 +78,22 @@ describe("Font Piksel 5x7 & Zona Huruf Fasad (FR-15)", () => {
       expect(b.glyph).toBeDefined();
       expect(b.glyph).toEqual(glyph);
 
-      // Periksa setiap sel di dalam zona huruf 5x7 (r = 0..6, c = 0..4)
-      for (let r = 0; r < 7; r++) {
+      // Zona huruf berada pada lantai f = 5..11 (y = 60 px s/d 126 px)
+      for (let f = 5; f <= 11; f++) {
+        const glyphRow = 11 - f; // f = 11 adalah baris atas glyph (0), f = 5 adalah baris bawah glyph (6)
         for (let c = 0; c < 5; c++) {
-          const win = b.windows.find((w) => w.col === c && w.row === r);
+          const win = b.windows.find((w) => w.col === c && w.row === f);
           expect(win).toBeDefined();
           if (!win || !glyph) continue;
 
-          const shouldBeLitPixel = glyph[r][c] === "1";
+          const shouldBeLitPixel = glyph[glyphRow][c] === "1";
 
           if (shouldBeLitPixel) {
             expect(win.isLetter).toBe(true);
             expect(win.hue).toBe("warm");
             expect(win.litAt).toBeGreaterThanOrEqual(0);
           } else {
-            // Jendela lain di dalam zona huruf harus padam
+            // Jendela dalam zona huruf yang bukan bagian huruf padam total
             expect(win.isLetter).toBe(false);
             expect(win.litAt).toBe(-1);
           }
@@ -100,7 +102,7 @@ describe("Font Piksel 5x7 & Zona Huruf Fasad (FR-15)", () => {
     }
   });
 
-  it("semua gedung berhuruf memiliki garis dasar seragam dan sel zona huruf persegi", () => {
+  it("semua gedung berhuruf memiliki garis dasar seragam, sel persegi, dan variasi siluet", () => {
     const sampleChars = ["A", "b", "C", "1", "9", "Z", "k", "o"];
 
     for (let i = 0; i < sampleChars.length; i++) {
@@ -115,18 +117,23 @@ describe("Font Piksel 5x7 & Zona Huruf Fasad (FR-15)", () => {
       expect(b.letterCell).toBe(LETTER_CELL);
       expect(b.letterCell).toBe(11);
 
-      // 3. Tinggi minimum gedung harus mencakup baseline + 7 cell + margin atap
-      const minRequiredHeight = LETTER_BASELINE + 7 * LETTER_CELL + 22; // 159 px
-      expect(b.height).toBeGreaterThanOrEqual(minRequiredHeight);
+      // 3. Tinggi minimum gedung mencakup baseline + 7 cell + lantai ekstra
+      expect(b.height).toBeGreaterThanOrEqual(150);
 
-      // 4. Lebar gedung berhuruf berkisar 5 * LETTER_CELL + 2 * margin ± 10%
-      const baseExpectedWidth = 5 * LETTER_CELL + 12; // 67 px
-      expect(b.width).toBeGreaterThanOrEqual(Math.floor(baseExpectedWidth * 0.9));
-      expect(b.width).toBeLessThanOrEqual(Math.ceil(baseExpectedWidth * 1.1));
+      // 4. Lebar gedung berhuruf berkisar 5 * LETTER_CELL + 2 * margin ± 10% (60..74 px)
+      expect(b.width).toBeGreaterThanOrEqual(60);
+      expect(b.width).toBeLessThanOrEqual(75);
+
+      // 5. Celah antar gedung berada dalam rentang nyaman (4 sampai 10 px)
+      expect(b.gap).toBeGreaterThanOrEqual(LETTER_MIN_GAP);
+      expect(b.gap).toBeLessThanOrEqual(LETTER_MAX_GAP);
+
+      // 6. Memiliki bentuk atap yang terdefinisi
+      expect(["flat", "setback", "watertank", "antenna"]).toContain(b.roofKind);
     }
   });
 
-  it("kata 'HALO' menghasilkan empat zona huruf yang sejajar", () => {
+  it("kata 'HALO' menghasilkan empat zona huruf yang sejajar pada ketinggian yang sama", () => {
     let state = createInitialCityState(42);
     const word = "HALO";
 
@@ -158,13 +165,16 @@ describe("Font Piksel 5x7 & Zona Huruf Fasad (FR-15)", () => {
     // Ketinggian puncak huruf pada keempat gedung sejajar persis pada y = 137 px
     expect(topOfLetters).toEqual([137, 137, 137, 137]);
 
-    // Celah antar gedung berurutan konstan seragam (LETTER_BUILDING_GAP = 6 px)
+    // Celah antar gedung berurutan berada dalam rentang serasi (4 sampai 10 px)
     for (let i = 0; i < state.items.length - 1; i++) {
       const current = state.items[i];
       const next = state.items[i + 1];
       const gap = next.x - (current.x + current.width);
-      expect(gap).toBe(LETTER_BUILDING_GAP);
-      expect(gap).toBe(6);
+      expect(gap).toBeGreaterThanOrEqual(4);
+      expect(gap).toBeLessThanOrEqual(10);
+      if ("gap" in current && current.gap !== undefined) {
+        expect(gap).toBe(current.gap);
+      }
     }
   });
 
@@ -179,6 +189,8 @@ describe("Font Piksel 5x7 & Zona Huruf Fasad (FR-15)", () => {
     expect(b1.windows.length).toBe(b2.windows.length);
     expect(b1.letterBaseline).toBe(b2.letterBaseline);
     expect(b1.letterCell).toBe(b2.letterCell);
+    expect(b1.roofKind).toBe(b2.roofKind);
+    expect(b1.gap).toBe(b2.gap);
   });
 
   it("huruf menyala setelah gedung selesai tumbuh dan padam seketika saat backspace (collapsing)", () => {

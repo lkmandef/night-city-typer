@@ -28,7 +28,7 @@ export function cityReducer(state: CityState, action: CityAction): CityState {
         state.cursorX,
         state.seed
       );
-      const gap = building.glyph ? LETTER_BUILDING_GAP : 4;
+      const gap = building.gap ?? (building.glyph ? LETTER_BUILDING_GAP : 4);
       const nextCursorX = state.cursorX + building.width + gap;
       return {
         ...state,

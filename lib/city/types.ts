@@ -12,6 +12,8 @@ export type CityAction =
 
 export type BuildingKind = "tower" | "block" | "house" | "lamp";
 
+export type RoofKind = "flat" | "setback" | "watertank" | "antenna";
+
 export interface BuildingWindow {
   col: number;
   row: number;
@@ -19,6 +21,9 @@ export interface BuildingWindow {
   litAt: number;
   hue: "warm" | "cool";
   isLetter?: boolean;
+  isStorefront?: boolean;
+  isHalo?: boolean;
+  brightness?: number; // 0.25 .. 0.55 untuk jendela redup
 }
 
 export type Window = BuildingWindow;
@@ -41,6 +46,9 @@ export interface Building {
   glyph?: string[];
   letterBaseline?: number;
   letterCell?: number;
+  roofKind?: RoofKind;
+  gap?: number;
+  hasDoor?: boolean;
 }
 
 export type SeparatorKind = "road" | "river" | "park";

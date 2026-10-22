@@ -1,28 +1,15 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import type { CityAction } from "@/lib/city/types";
 
 interface HiddenInputProps {
   onAction: (action: CityAction, source: "beforeinput" | "keydown") => void;
+  onFocusChange?: (info: string) => void;
 }
 
-export default function HiddenInput({ onAction }: HiddenInputProps) {
+export default function HiddenInput({ onAction, onFocusChange }: HiddenInputProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    // Fokuskan input saat pengguna menyentuh atau mengklik layar
-    const handlePointerDown = () => {
-      if (inputRef.current) {
-        inputRef.current.focus({ preventScroll: true });
-      }
-    };
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-    };
-  }, []);
 
   const handleBeforeInput = (e: React.FormEvent<HTMLInputElement>) => {
     const nativeEvent = e.nativeEvent as InputEvent;
@@ -60,20 +47,48 @@ export default function HiddenInput({ onAction }: HiddenInputProps) {
     }
   };
 
+  const handleFocus = () => {
+    const active = document.activeElement;
+    const tagName = active ? active.tagName : "INPUT";
+    const id = active?.id ? `#${active.id}` : "";
+    const info = `FOKUS (${tagName}${id})`;
+    console.log(`[FocusDebug] ${info}`);
+    onFocusChange?.(info);
+  };
+
+  const handleBlur = () => {
+    // Beri jeda 1 tick agar document.activeElement merefleksikan elemen baru yang menerima fokus
+    setTimeout(() => {
+      const active = document.activeElement;
+      const tagName = active ? active.tagName : "NONE";
+      const id = active?.id ? `#${active.id}` : "";
+      const info = `BLUR (direbut: ${tagName}${id})`;
+      console.log(`[FocusDebug] ${info}`);
+      onFocusChange?.(info);
+    }, 0);
+  };
+
   return (
     <input
       ref={inputRef}
+      id="city-full-input"
       type="text"
       inputMode="text"
       autoCapitalize="off"
       autoComplete="off"
       autoCorrect="off"
       spellCheck={false}
-      tabIndex={-1}
-      aria-hidden="true"
-      className="fixed top-0 left-0 h-px w-px opacity-0 pointer-events-none text-base"
+      tabIndex={0}
+      aria-label="Ketik untuk menumbuhkan kota"
+      className="fixed inset-0 z-10 h-full w-full opacity-0 pointer-events-auto bg-transparent caret-transparent text-base cursor-default select-none border-none outline-none focus:outline-none focus:ring-0"
+      style={{
+        WebkitTapHighlightColor: "transparent",
+        fontSize: "16px", // Mencegah auto-zoom di iOS Safari
+      }}
       onBeforeInput={handleBeforeInput}
       onInput={handleInput}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
     />
   );
 }

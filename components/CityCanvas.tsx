@@ -1,14 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CityAction } from "@/lib/city/types";
 import { drawGround, drawSky } from "@/lib/render/sky";
 import HiddenInput from "@/components/HiddenInput";
+
+function subscribeToLocation(callback: () => void) {
+  window.addEventListener("popstate", callback);
+  return () => window.removeEventListener("popstate", callback);
+}
+
+function getDebugSnapshot() {
+  return new URLSearchParams(window.location.search).get("debug") === "1";
+}
+
+function getDebugServerSnapshot() {
+  return false;
+}
 
 export default function CityCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sizeRef = useRef({ width: 0, height: 0, dpr: 1 });
   const [debugAction, setDebugAction] = useState<string | null>(null);
+  const [focusDebugInfo, setFocusDebugInfo] = useState<string>("Belum ada event fokus");
+
+  // Langganan ke URL query ?debug=1 menggunakan useSyncExternalStore
+  const isDebug = useSyncExternalStore(
+    subscribeToLocation,
+    getDebugSnapshot,
+    getDebugServerSnapshot
+  );
 
   // Pelacak aksi terakhir untuk mencegah duplikasi (desktop keydown vs mobile beforeinput)
   const lastActionRef = useRef<{ key: string; source: string; time: number }>({
@@ -37,13 +58,13 @@ export default function CityCanvas() {
       // Log aksi di console
       console.log(`[CityInput] (${source})`, action);
 
-      if (process.env.NODE_ENV !== "production") {
+      if (isDebug) {
         setDebugAction(
           `${action.type}${action.type === "TYPE_CHAR" ? ` ('${action.char}')` : ""} [${source}]`
         );
       }
     },
-    []
+    [isDebug]
   );
 
   // Tangani event keyboard desktop
@@ -128,13 +149,22 @@ export default function CityCanvas() {
     <>
       <canvas
         ref={canvasRef}
-        className="fixed inset-0 h-full w-full block touch-none"
+        className="fixed inset-0 h-full w-full block pointer-events-none"
         aria-label="Night City Typer interactive canvas"
       />
-      <HiddenInput onAction={handleAction} />
-      {process.env.NODE_ENV !== "production" && debugAction && (
-        <div className="fixed bottom-3 left-3 z-50 rounded bg-black/80 px-2.5 py-1 font-mono text-xs text-emerald-400 border border-emerald-900 pointer-events-none select-none">
-          Aksi terakhir: {debugAction}
+      <HiddenInput onAction={handleAction} onFocusChange={setFocusDebugInfo} />
+      {isDebug && (
+        <div className="fixed bottom-3 left-3 z-50 rounded bg-black/90 p-2.5 font-mono text-xs text-emerald-400 border border-emerald-800 pointer-events-none select-none max-w-sm space-y-1">
+          <div>Aksi: {debugAction || "(belum ada)"}</div>
+          <div>Fokus: {focusDebugInfo}</div>
+          <div>
+            ActiveElement:{" "}
+            {typeof document !== "undefined"
+              ? `${document.activeElement?.tagName || "NONE"}${
+                  document.activeElement?.id ? `#${document.activeElement.id}` : ""
+                }`
+              : "-"}
+          </div>
         </div>
       )}
     </>

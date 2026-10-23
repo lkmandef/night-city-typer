@@ -1,7 +1,7 @@
 import type { Building, Separator } from "@/lib/city/types";
 import type { BuildingGroup } from "@/lib/city/groups";
 import type { Walker } from "@/lib/city/walkers";
-import { drawGround, drawMoon, drawSky, type TimePalette } from "./sky";
+import { drawGround, drawMoon, drawSky, type MoonPosition, type TimePalette } from "./sky";
 import { drawStars, type Star } from "./stars";
 import { type ParallaxRenderer } from "./parallax";
 import { drawSeparators } from "./separators";
@@ -25,6 +25,7 @@ export interface RenderPipelineOptions {
   palette?: TimePalette;
   walkers?: Walker[];
   groups?: BuildingGroup[];
+  moonPos?: MoonPosition;
 }
 
 /**
@@ -87,7 +88,7 @@ export function renderScene(options: RenderPipelineOptions): void {
   drawStars(ctx, stars, width, height, time, palette?.starsAlpha ?? 1.0);
 
   // 3. Bulan dengan pendaran radial lembut
-  drawMoon(ctx, width, height, time, palette?.moonAlpha ?? 1.0);
+  drawMoon(ctx, width, height, time, palette?.moonAlpha ?? 1.0, options.moonPos);
 
   // 4. Gedung latar (dua lapis parallax 0.2x dan 0.4x)
   parallax.draw(ctx, cameraX, groundY);

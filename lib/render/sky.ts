@@ -137,6 +137,33 @@ export function drawSky(
   ctx.fillRect(0, 0, width, groundY);
 }
 
+export interface MoonPosition {
+  x: number;
+  y: number;
+  radius: number;
+}
+
+/**
+ * Menghitung posisi target bulan secara murni.
+ * Posisi dasar adalah pecahan viewport (x 0.82, y 0.14) ditambah gerak sangat lambat berbasis waktu terakumulasi.
+ * Posisi tidak bergantung pada cameraX atau jumlah gedung.
+ */
+export function moonPosition(
+  width: number,
+  height: number,
+  accumulatedTime: number
+): MoonPosition {
+  // Drift sangat lambat berbasis fungsi trigonometri kontinu tanpa wrap/modulo
+  const driftX = Math.sin(accumulatedTime * 0.00005) * 8;
+  const driftY = Math.cos(accumulatedTime * 0.00003) * 4;
+
+  const x = width * 0.82 + driftX;
+  const y = height * 0.14 + driftY;
+  const radius = Math.max(14, Math.min(24, Math.round(width * 0.022)));
+
+  return { x, y, radius };
+}
+
 /**
  * Menggambar bulan lembut di sudut kanan atas dengan pendaran radial.
  */
@@ -145,13 +172,15 @@ export function drawMoon(
   width: number,
   height: number,
   time: number,
-  alpha = 1.0
+  alpha = 1.0,
+  moonPos?: { x: number; y: number; radius?: number }
 ): void {
   if (alpha <= 0.02) return;
 
-  const moonX = width * 0.82 - ((time * 0.0015) % 30);
-  const moonY = height * 0.2;
-  const radius = Math.max(14, Math.min(24, Math.round(width * 0.022)));
+  const pos = moonPos ?? moonPosition(width, height, time);
+  const moonX = pos.x;
+  const moonY = pos.y;
+  const radius = pos.radius ?? Math.max(14, Math.min(24, Math.round(width * 0.022)));
 
   const hasSave = typeof ctx.save === "function";
   if (hasSave) {

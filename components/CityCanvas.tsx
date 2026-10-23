@@ -13,7 +13,7 @@ import {
 import { generateStars } from "@/lib/render/stars";
 import { createParallaxRenderer } from "@/lib/render/parallax";
 import { renderScene } from "@/lib/render/pipeline";
-import { interpolatePalette, TIME_PALETTES } from "@/lib/render/sky";
+import { interpolatePalette, moonPosition, type MoonPosition, TIME_PALETTES } from "@/lib/render/sky";
 import { exportCanvasToPng } from "@/lib/render/exportPng";
 import { easeInOutCubic } from "@/lib/utils/easing";
 import {
@@ -54,6 +54,12 @@ export default function CityCanvas() {
   const frameCountRef = useRef(0);
   const lastFpsTimeRef = useRef(0);
   const fpsRef = useRef(60);
+
+  // Posisi bulan halus dan tracking selisih frame
+  const moonTimeRef = useRef(0);
+  const moonPosRef = useRef<MoonPosition | null>(null);
+  const moonDeltaHistoryRef = useRef<{ time: number; delta: number }[]>([]);
+  const maxMoonDelta5sRef = useRef<number>(0);
 
   const [isCityEmpty, setIsCityEmpty] = useState(true);
   const wasEmptyRef = useRef(true);
@@ -391,6 +397,40 @@ export default function CityCanvas() {
           isItemVisible(b.x, b.width, cameraX, worldScreenWidth)
         );
 
+        // Posisi bulan: mengejar target dengan interpolasi halus (lerp 0.1 per frame) saat ukuran kanvas berubah
+        const clampedMoonDt = Math.min(50, Math.max(0, dt));
+        moonTimeRef.current += clampedMoonDt;
+
+        const targetMoon = moonPosition(width, height, moonTimeRef.current);
+        if (!moonPosRef.current) {
+          moonPosRef.current = { ...targetMoon };
+        } else {
+          const prevX = moonPosRef.current.x;
+          const prevY = moonPosRef.current.y;
+          const lerpFactor = 0.1;
+          moonPosRef.current.x = prevX + (targetMoon.x - prevX) * lerpFactor;
+          moonPosRef.current.y = prevY + (targetMoon.y - prevY) * lerpFactor;
+          moonPosRef.current.radius = targetMoon.radius;
+
+          const frameDelta = Math.hypot(
+            moonPosRef.current.x - prevX,
+            moonPosRef.current.y - prevY
+          );
+          moonDeltaHistoryRef.current.push({ time: currentTime, delta: frameDelta });
+          const cutoff = currentTime - 5000;
+          while (
+            moonDeltaHistoryRef.current.length > 0 &&
+            moonDeltaHistoryRef.current[0].time < cutoff
+          ) {
+            moonDeltaHistoryRef.current.shift();
+          }
+          let maxD = 0;
+          for (const item of moonDeltaHistoryRef.current) {
+            if (item.delta > maxD) maxD = item.delta;
+          }
+          maxMoonDelta5sRef.current = maxD;
+        }
+
         // 3. Render pemandangan lengkap melalui pipeline
         renderScene({
           ctx,
@@ -409,13 +449,14 @@ export default function CityCanvas() {
           palette: currentPalette,
           walkers: walkersRef.current,
           groups: groupsRef.current,
+          moonPos: moonPosRef.current ?? undefined,
         });
 
         // Debug info update
         if (isDebug && Math.floor(currentTime) % 10 === 0) {
           setWalkerCount(walkersRef.current.length);
           setCameraDebugInfo(
-            `FPS: ${fpsRef.current} | Cam: ${Math.round(cameraX)} | Skala: ${worldScale.toFixed(2)} | Vis: ${visibleBuildings.length}/${allBuildings.length} | Walkers: ${walkersRef.current.length} (${groups.length} grp) | Waktu: ${currentPalette.phaseName}`
+            `FPS: ${fpsRef.current} | Bulan Δmax: ${maxMoonDelta5sRef.current.toFixed(2)}px | Cam: ${Math.round(cameraX)} | Skala: ${worldScale.toFixed(2)} | Vis: ${visibleBuildings.length}/${allBuildings.length} | Walkers: ${walkersRef.current.length} (${groups.length} grp) | Waktu: ${currentPalette.phaseName}`
           );
         }
       }

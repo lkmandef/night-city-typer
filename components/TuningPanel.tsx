@@ -325,50 +325,102 @@ export default function TuningPanel() {
           </div>
         </section>
 
-        {/* Bobot Kolom Lebar Gedung */}
+        {/* Tanah, Pantulan & Perabot Jalan (FR-20) */}
         <section className="space-y-1.5">
           <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-            Bobot Kolom Gedung (5 / 7 Kolom)
+            Tanah & Pantulan (FR-20)
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="flex flex-col items-center rounded bg-slate-900 p-1.5 border border-white/5">
-              <span className="text-[10px] text-slate-400">5 Kolom (65%)</span>
-              <span className="text-emerald-400 font-bold">{config.COL_WEIGHTS[5]}</span>
-              <input
-                type="range"
-                min="0.2"
-                max="0.9"
-                step="0.05"
-                value={config.COL_WEIGHTS[5]}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  updateConfig({
-                    COL_WEIGHTS: { 5: val, 7: parseFloat((1 - val).toFixed(2)) },
-                  });
-                  keepTypingFocus();
-                }}
-                className="w-full accent-emerald-400 h-1 mt-1 cursor-pointer"
-              />
+
+          <div className="flex flex-col gap-1">
+            <div className="flex justify-between">
+              <span>Kolam Cahaya (POOL_ALPHA):</span>
+              <span className="text-emerald-400">{config.POOL_ALPHA.toFixed(2)}</span>
             </div>
-            <div className="flex flex-col items-center rounded bg-slate-900 p-1.5 border border-white/5">
-              <span className="text-[10px] text-slate-400">7 Kolom (35%)</span>
-              <span className="text-emerald-400 font-bold">{config.COL_WEIGHTS[7]}</span>
-              <input
-                type="range"
-                min="0.1"
-                max="0.8"
-                step="0.05"
-                value={config.COL_WEIGHTS[7]}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  updateConfig({
-                    COL_WEIGHTS: { 5: parseFloat((1 - val).toFixed(2)), 7: val },
-                  });
-                  keepTypingFocus();
-                }}
-                className="w-full accent-emerald-400 h-1 mt-1 cursor-pointer"
-              />
+            <input
+              type="range"
+              min="0.02"
+              max="0.16"
+              step="0.02"
+              value={config.POOL_ALPHA}
+              onChange={(e) => {
+                updateConfig({ POOL_ALPHA: parseFloat(e.target.value) });
+                keepTypingFocus();
+              }}
+              className="accent-emerald-400 h-1.5 cursor-pointer bg-slate-800 rounded"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <div className="flex justify-between">
+              <span>Pantulan Jalan (REFLECTION_ALPHA):</span>
+              <span className="text-emerald-400">{config.REFLECTION_ALPHA.toFixed(2)}</span>
             </div>
+            <input
+              type="range"
+              min="0.01"
+              max="0.10"
+              step="0.01"
+              value={config.REFLECTION_ALPHA}
+              onChange={(e) => {
+                updateConfig({ REFLECTION_ALPHA: parseFloat(e.target.value) });
+                keepTypingFocus();
+              }}
+              className="accent-emerald-400 h-1.5 cursor-pointer bg-slate-800 rounded"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <div className="flex justify-between">
+              <span>Peluang Lampu Jalan:</span>
+              <span className="text-emerald-400">
+                {(config.FURNITURE_RATIOS.lamp * 100).toFixed(0)}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0.1"
+              max="0.6"
+              step="0.05"
+              value={config.FURNITURE_RATIOS.lamp}
+              onChange={(e) => {
+                const lamp = parseFloat(e.target.value);
+                updateConfig({
+                  FURNITURE_RATIOS: {
+                    ...config.FURNITURE_RATIOS,
+                    lamp,
+                  },
+                });
+                keepTypingFocus();
+              }}
+              className="accent-emerald-400 h-1.5 cursor-pointer bg-slate-800 rounded"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <div className="flex justify-between">
+              <span>Peluang Pohon Pot:</span>
+              <span className="text-emerald-400">
+                {(config.FURNITURE_RATIOS.tree * 100).toFixed(0)}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0.05"
+              max="0.4"
+              step="0.05"
+              value={config.FURNITURE_RATIOS.tree}
+              onChange={(e) => {
+                const tree = parseFloat(e.target.value);
+                updateConfig({
+                  FURNITURE_RATIOS: {
+                    ...config.FURNITURE_RATIOS,
+                    tree,
+                  },
+                });
+                keepTypingFocus();
+              }}
+              className="accent-emerald-400 h-1.5 cursor-pointer bg-slate-800 rounded"
+            />
           </div>
         </section>
       </div>

@@ -77,6 +77,7 @@ Portofolio developer sering berisi project yang mirip (to-do list, e-commerce, d
 | FR-17 | Pengunjung dapat mengganti warna huruf lewat menu warna | Should |
 | FR-18 | Teks yang diketik selalu terlihat (TypedTextOverlay) | Must |
 | FR-19 | Pengunjung dapat melihat seluruh kota (Mode ringkasan "Lihat semua") | Should |
+| FR-20 | Tanah kota memiliki trotoar, jalan, pantulan cahaya, dan perabot jalan | Should |
 
 ### 2.7 Non-Functional Requirements
 

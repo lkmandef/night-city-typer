@@ -38,6 +38,8 @@ function initPodiumLightCanvas(): void {
  * Digambar di area tanah (di bawah baseline groundY), tidak di atas fasad gedung,
  * sehingga tidak pernah menimpa huruf yang menyala.
  */
+import { getWalkerDepthScale } from "@/lib/city/ground";
+
 export function drawWalkers(
   ctx: CanvasRenderingContext2D,
   walkers: Walker[],
@@ -45,9 +47,10 @@ export function drawWalkers(
   groundY: number,
   worldScale: number,
   cameraX: number,
-  worldScreenWidth: number
+  worldScreenWidth: number,
+  reducedMotion = false
 ): void {
-  // 1. Gambar gradien cahaya hangat tipis (opacity ~0.12) di tanah di bawah tiap kelompok gedung
+  // 1. Gambar gradien cahaya hangat tipis di tanah di bawah tiap kelompok gedung
   if (!podiumLightCanvas) initPodiumLightCanvas();
 
   if (podiumLightCanvas && groups.length > 0) {
@@ -75,34 +78,41 @@ export function drawWalkers(
 
   if (walkers.length === 0) return;
 
-  // 2. Gambar karakter dan bayangan kaki
-  for (const walker of walkers) {
-    if (walker.alpha <= 0) continue;
+  // 2. Filter walker yang terlihat di layar kamera, lalu urutkan menurut lajur Y (Y-sorting)
+  // Karakter di lajur atas (dekat podium) digambar lebih dulu, lajur bawah (dekat jalan) di depan
+  const visibleWalkers = walkers
+    .filter(
+      (w) =>
+        w.alpha > 0 &&
+        w.x + 40 >= cameraX &&
+        w.x - 40 <= cameraX + worldScreenWidth
+    )
+    .sort((a, b) => a.laneY - b.laneY);
 
-    // Culling walker yang berada di luar layar
-    if (
-      walker.x + 40 < cameraX ||
-      walker.x - 40 > cameraX + worldScreenWidth
-    ) {
-      continue;
-    }
-
+  for (const walker of visibleWalkers) {
+    const depthScale = getWalkerDepthScale(walker.laneIndex ?? 1);
     const { width, height, scale } = getWalkerDimensions(
       walker.kind,
-      worldScale
+      worldScale,
+      depthScale
     );
 
     const frameName = getWalkerFrameName(walker);
-    const sprite = getWalkerSpriteCanvas(walker.kind, frameName, walker.dir);
+    // Tolehan manusia saat jeda (cermin singkat)
+    const renderDir = (walker.lookFlip ? (walker.dir === 1 ? -1 : 1) : walker.dir) as 1 | -1;
+    const sprite = getWalkerSpriteCanvas(walker.kind, frameName, renderDir);
 
-    const footY = groundY + walker.laneY;
+    // Gerak naik-turun 1 px pada frame langkah (bobbing)
+    const isStepBob =
+      !reducedMotion && walker.state === "walk" && walker.frame === 1;
+    const footY = groundY + walker.laneY - (isStepBob ? 1 : 0);
 
-    // Bayangan elips kecil di kaki
+    // Bayangan elips lebih tegas di kaki
     ctx.beginPath();
-    const shadowRx = walker.kind === "human" ? 4 * scale : 6 * scale;
-    const shadowRy = walker.kind === "human" ? 1.5 * scale : 1.8 * scale;
+    const shadowRx = walker.kind === "human" ? 4.5 * scale : 6.5 * scale;
+    const shadowRy = walker.kind === "human" ? 1.8 * scale : 2.0 * scale;
     ctx.ellipse(walker.x, footY, shadowRx, shadowRy, 0, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(10, 14, 26, ${(0.38 * walker.alpha).toFixed(3)})`;
+    ctx.fillStyle = `rgba(5, 8, 16, ${(0.55 * walker.alpha).toFixed(3)})`;
     ctx.fill();
 
     // Gambar sprite pixel-art tajam (imageSmoothingEnabled = false)

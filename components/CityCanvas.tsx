@@ -23,6 +23,7 @@ import {
 } from "@/lib/city/palette";
 import { updateConfig } from "@/lib/city/config";
 import { computeGroups, type BuildingGroup } from "@/lib/city/groups";
+import { computeAdaptiveGround } from "@/lib/city/ground";
 import { updateWalkers, type Walker } from "@/lib/city/walkers";
 import { buildTypedText, computeOverviewZoom } from "@/lib/city/text";
 import TypedTextOverlay from "@/components/TypedTextOverlay";
@@ -300,10 +301,10 @@ export default function CityCanvas() {
 
       sizeRef.current = { width, height, dpr };
 
-      const groundY = height * 0.85;
+      const worldScale = computeWorldScale(width);
+      const { groundY } = computeAdaptiveGround(height, worldScale);
       parallaxRef.current.setup(groundY);
 
-      const worldScale = computeWorldScale(width);
       const worldScreenWidth = width / worldScale;
 
       // Set titik awal kota (sekitar 15% lebar layar) jika kota masih kosong
@@ -410,7 +411,7 @@ export default function CityCanvas() {
       );
 
       if (width > 0 && height > 0) {
-        const groundY = height * 0.85;
+        const { groundY, showDecorations } = computeAdaptiveGround(height, effectiveScale);
         const cameraX = cityStateRef.current.cameraX;
 
         ctx.clearRect(0, 0, width, height);
@@ -498,6 +499,9 @@ export default function CityCanvas() {
           walkers: walkersRef.current,
           groups: groupsRef.current,
           moonPos: moonPosRef.current ?? undefined,
+          showDecorations,
+          reducedMotion: reducedMotionRef.current,
+          seed: cityStateRef.current.seed,
         });
 
         // Debug info update

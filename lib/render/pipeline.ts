@@ -1,7 +1,10 @@
 import type { Building, Separator } from "@/lib/city/types";
 import type { BuildingGroup } from "@/lib/city/groups";
 import type { Walker } from "@/lib/city/walkers";
-import { drawGround, drawMoon, drawSky, type MoonPosition, type TimePalette } from "./sky";
+import { drawGround, drawReflectionsAndPools } from "./ground";
+import { drawStreetFurniture } from "./furniture";
+import { getBuildingFurniture, type StreetFurniture } from "@/lib/city/ground";
+import { drawMoon, drawSky, type MoonPosition, type TimePalette } from "./sky";
 import { drawStars, type Star } from "./stars";
 import { type ParallaxRenderer } from "./parallax";
 import { drawSeparators } from "./separators";
@@ -26,6 +29,10 @@ export interface RenderPipelineOptions {
   walkers?: Walker[];
   groups?: BuildingGroup[];
   moonPos?: MoonPosition;
+  showDecorations?: boolean;
+  reducedMotion?: boolean;
+  seed?: number;
+  furniture?: StreetFurniture[];
 }
 
 /**
@@ -93,16 +100,36 @@ export function renderScene(options: RenderPipelineOptions): void {
   // 4. Gedung latar (dua lapis parallax 0.2x dan 0.4x)
   parallax.draw(ctx, cameraX, groundY);
 
-  // 5. Dasar tanah
-  drawGround(ctx, width, height, palette);
+  const worldScreenWidth = width / worldScale;
+  const showDecorations = options.showDecorations !== false;
 
-  // 6. Objek dunia (Pemisah, Gedung, Partikel) dengan skala dan kamera
+  // 5. Dasar tanah, trotoar, dan jalan
+  drawGround(ctx, width, height, palette, {
+    groundY,
+    worldScale,
+    cameraX,
+    reducedMotion: options.reducedMotion,
+  });
+
+  // 6. Objek dunia (Pantulan, Pemisah, Gedung, Perabot, Walker, Partikel) dengan skala dan kamera
   ctx.save();
   ctx.translate(0, groundY);
   ctx.scale(worldScale, worldScale);
   ctx.translate(-cameraX, -groundY);
 
-  // Gambar ghosts (elemen yang sedang runtuh/memudar) di belakang item aktif
+  // 6a. Pantulan jalan basah dan kolam cahaya trotoar di bawah gedung
+  if (showDecorations) {
+    drawReflectionsAndPools(
+      ctx,
+      visibleBuildings,
+      groundY,
+      palette,
+      cameraX,
+      worldScreenWidth
+    );
+  }
+
+  // 6b. Gambar ghosts (elemen yang sedang runtuh/memudar) di belakang item aktif
   if (options.visibleGhostSeparators && options.visibleGhostSeparators.length > 0) {
     drawSeparators(ctx, options.visibleGhostSeparators, groundY, time);
   }
@@ -110,11 +137,23 @@ export function renderScene(options: RenderPipelineOptions): void {
     drawBuildings(ctx, options.visibleGhostBuildings, groundY, time, palette?.windowLitFactor ?? 1.0);
   }
 
-  // Gambar item aktif di depan
+  // 6c. Gambar item aktif di depan
   drawSeparators(ctx, visibleSeparators, groundY, time);
   drawBuildings(ctx, visibleBuildings, groundY, time, palette?.windowLitFactor ?? 1.0);
+
+  // 6d. Perabot jalan (Lampu, Pohon, Bangku, Mobil) jika tinggi tanah cukup
+  if (showDecorations) {
+    const furnitureList =
+      options.furniture ??
+      visibleBuildings
+        .map((b) => getBuildingFurniture(b, options.seed ?? 1))
+        .filter((f): f is StreetFurniture => f !== null);
+
+    drawStreetFurniture(ctx, furnitureList, groundY, cameraX, worldScreenWidth);
+  }
+
+  // 6e. Karakter berjalan (Walkers)
   if (options.walkers && options.groups) {
-    const worldScreenWidth = width / worldScale;
     drawWalkers(
       ctx,
       options.walkers,
@@ -122,9 +161,12 @@ export function renderScene(options: RenderPipelineOptions): void {
       groundY,
       worldScale,
       cameraX,
-      worldScreenWidth
+      worldScreenWidth,
+      options.reducedMotion
     );
   }
+
+  // 6f. Kunang-kunang di taman
   drawFireflies(ctx, visibleSeparators, groundY, time);
 
   ctx.restore();

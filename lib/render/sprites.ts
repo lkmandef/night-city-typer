@@ -48,38 +48,47 @@ const HUMAN_SPRITES: Record<string, string[]> = {
 
 // 2. Matriks Piksel Kucing (~9x6 piksel)
 // '1' = bulu (#d9cfc0)
+// '2' = garis rim light tipis di punggung/telinga (#ffffff)
 // 'E' = mata kuning (#ffd24a)
 // '.' = transparan
 const CAT_SPRITES: Record<string, string[]> = {
   idle: [
-    ".....1.1.",
-    "....1E1E1",
+    ".....2.2.",
+    "....1E1E2",
     "1..111111",
-    ".1111111.",
+    ".2111111.",
+    "..111111.",
+    "..1.1.1.1",
+  ],
+  idle_wag: [
+    "....21.2.",
+    "1...1E1E2",
+    ".1.111111",
+    ".2111111.",
     "..111111.",
     "..1.1.1.1",
   ],
   walk0: [
-    ".....1.1.",
-    "....1E1E1",
+    ".....2.2.",
+    "....1E1E2",
     "1..111111",
-    ".1111111.",
+    ".2111111.",
     "..111111.",
     ".1..1..1.",
   ],
   walk1: [
-    ".....1.1.",
-    "....1E1E1",
+    ".....2.2.",
+    "....1E1E2",
     ".1.111111",
-    "..1111111.",
+    ".2111111.",
     "..111111.",
     "...1.11..",
   ],
   sit: [
-    "......1.1",
+    "......2.2",
     ".....1E1E",
     ".....1111",
-    "...111111",
+    "...211111",
     ".11111111",
     "111111111",
   ],
@@ -92,6 +101,7 @@ const HUMAN_COLORS: Record<string, string> = {
 
 const CAT_COLORS: Record<string, string> = {
   "1": "#d9cfc0",
+  "2": "#ffffff",
   E: "#ffd24a",
 };
 
@@ -179,13 +189,14 @@ export function getWalkerSpriteCanvas(
  */
 export function getWalkerDimensions(
   kind: WalkerKind,
-  worldScale: number
+  worldScale: number,
+  depthScale = 1.0
 ): { width: number; height: number; scale: number } {
   // Tinggi minimum manusia di HP = 10 CSS px
   const minHumanWorldHeight = 10 / Math.max(0.01, worldScale);
-  const baseHumanWorldHeight = 9 * WALKER_SPRITE_PX;
+  const baseHumanWorldHeight = 9 * WALKER_SPRITE_PX * depthScale;
   const effectiveHumanHeight = Math.max(baseHumanWorldHeight, minHumanWorldHeight);
-  const scale = effectiveHumanHeight / 9;
+  const scale = (effectiveHumanHeight / 9) * depthScale;
 
   if (kind === "human") {
     return { width: 5 * scale, height: 9 * scale, scale };
@@ -203,6 +214,9 @@ export function getWalkerFrameName(walker: Walker): string {
   }
   if (walker.state === "sit" && walker.kind === "cat") {
     return "sit";
+  }
+  if (walker.kind === "cat" && walker.isTailWag) {
+    return "idle_wag";
   }
   return "idle";
 }

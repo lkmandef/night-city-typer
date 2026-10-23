@@ -10,9 +10,9 @@ import {
   WALKER_CAT_SPEED_MIN,
   WALKER_HUMAN_SPEED_MAX,
   WALKER_HUMAN_SPEED_MIN,
-  WALKER_LANE_OFFSET,
-  WALKER_LANE_VARIATION,
 } from "./config";
+
+import { getWalkerLaneY } from "./ground";
 
 export type WalkerKind = "cat" | "human";
 export type WalkerState = "enter" | "walk" | "pause" | "sit" | "exit";
@@ -22,6 +22,7 @@ export interface Walker {
   groupKey: number;
   kind: WalkerKind;
   x: number;
+  laneIndex: number;
   laneY: number;
   dir: 1 | -1;
   state: WalkerState;
@@ -30,8 +31,11 @@ export interface Walker {
   frameTimer: number;
   alpha: number;
   speed: number;
+  currentSpeed?: number;
   rngState: number;
   exitDuration?: number;
+  lookFlip?: boolean;
+  isTailWag?: boolean;
 }
 
 /**
@@ -78,9 +82,10 @@ export function createWalker(
       ? WALKER_CAT_SPEED_MIN + r * (WALKER_CAT_SPEED_MAX - WALKER_CAT_SPEED_MIN)
       : WALKER_HUMAN_SPEED_MIN + r * (WALKER_HUMAN_SPEED_MAX - WALKER_HUMAN_SPEED_MIN);
 
-  // 3. Posisi jalur y (laneY) di area tanah
+  // 3. Posisi lajur trotoar (3 lajur: 0=dekat podium, 1=tengah, 2=dekat curb)
   [r, s] = nextRng(s);
-  const laneY = WALKER_LANE_OFFSET + (r * 2 - 1) * WALKER_LANE_VARIATION;
+  const laneIndex = r < 0.333 ? 0 : r < 0.666 ? 1 : 2;
+  const laneY = getWalkerLaneY(laneIndex);
 
   // 4. Arah jalan awal (-1 atau 1)
   [r, s] = nextRng(s);
@@ -96,6 +101,7 @@ export function createWalker(
     groupKey: group.key,
     kind,
     x: clampedX,
+    laneIndex,
     laneY,
     dir,
     state: "enter",
@@ -104,6 +110,7 @@ export function createWalker(
     frameTimer: 0,
     alpha: 0,
     speed,
+    currentSpeed: 0,
     rngState: s,
     exitDuration: 0.5,
   };
@@ -168,8 +175,15 @@ export function updateWalkers(
           }
 
           case "walk": {
-            const effectiveSpeed = (reducedMotion ? 0.4 : 1.0) * w.speed;
+            // Percepatan halus saat mulai berjalan (~0.3 detik untuk mencapai kecepatan penuh)
+            const accel = w.speed / 0.3;
+            w.currentSpeed = Math.min(w.speed, (w.currentSpeed ?? 0) + accel * dtSec);
+
+            const effectiveSpeed = (reducedMotion ? 0.4 : 1.0) * w.currentSpeed;
             w.x += w.dir * effectiveSpeed * dtSec;
+
+            w.lookFlip = false;
+            w.isTailWag = false;
 
             // Frame animasi jalan (0 dan 1) berganti tiap ~150 ms
             w.frameTimer += dtSec;
@@ -183,6 +197,7 @@ export function updateWalkers(
               w.x = group.minX;
               w.dir = 1;
               w.state = "pause";
+              w.currentSpeed = 0;
               // Jeda pendek saat berbalik di batas (0.3 .. 0.6 detik)
               w.stateTimer = 0.3 + stepWalkerRand(w) * 0.3;
               w.frame = 0;
@@ -190,12 +205,14 @@ export function updateWalkers(
               w.x = group.maxX;
               w.dir = -1;
               w.state = "pause";
+              w.currentSpeed = 0;
               // Jeda pendek saat berbalik di batas (0.3 .. 0.6 detik)
               w.stateTimer = 0.3 + stepWalkerRand(w) * 0.3;
               w.frame = 0;
             } else {
               w.stateTimer -= dtSec;
               if (w.stateTimer <= 0) {
+                w.currentSpeed = 0;
                 // Jeda acak atau kucing duduk
                 if (
                   w.kind === "cat" &&
@@ -218,23 +235,52 @@ export function updateWalkers(
           case "pause": {
             w.frame = 0;
             w.stateTimer -= dtSec;
+
+            // Kucing menggoyang ekor saat jeda (frame tambahan idle_wag)
+            if (w.kind === "cat" && !reducedMotion) {
+              w.frameTimer += dtSec;
+              if (w.frameTimer >= 0.35) {
+                w.frameTimer = 0;
+                w.isTailWag = !w.isTailWag;
+              }
+            } else {
+              w.isTailWag = false;
+            }
+
+            // Manusia sesekali menoleh (cermin singkat) saat jeda
+            if (w.kind === "human" && !reducedMotion) {
+              if (w.stateTimer > 0.6 && w.stateTimer < 1.2) {
+                w.lookFlip = true;
+              } else {
+                w.lookFlip = false;
+              }
+            } else {
+              w.lookFlip = false;
+            }
+
             if (w.stateTimer <= 0) {
+              w.lookFlip = false;
+              w.isTailWag = false;
               w.state = "walk";
               w.stateTimer = 2.0 + stepWalkerRand(w) * 3.0;
               w.frame = 0;
               w.frameTimer = 0;
+              w.currentSpeed = 0;
             }
             break;
           }
 
           case "sit": {
             w.frame = 0;
+            w.lookFlip = false;
+            w.isTailWag = false;
             w.stateTimer -= dtSec;
             if (w.stateTimer <= 0) {
               w.state = "walk";
               w.stateTimer = 2.0 + stepWalkerRand(w) * 3.0;
               w.frame = 0;
               w.frameTimer = 0;
+              w.currentSpeed = 0;
             }
             break;
           }

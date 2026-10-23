@@ -43,7 +43,7 @@ export interface CityConfig {
   ROAD_MIN_WIDTH: number; // Lebar minimum jalan (65 px)
   ROAD_MAX_WIDTH: number; // Lebar maksimum jalan (95 px)
 
-  // Karakter Berjalan (Walkers FR-16)
+  // Karakter Berjalan (Walkers FR-16 & FR-20)
   WALKER_MIN_GROUP: number;
   WALKER_MAX_GROUP: number;
   WALKER_CHUNK: number;
@@ -56,6 +56,25 @@ export interface CityConfig {
   WALKER_SPRITE_PX: number;
   WALKER_CAT_SIT_CHANCE: number;
   WALKER_BOUNDS_MARGIN: number;
+
+  // Tanah Hidup & Trotoar (FR-20)
+  GROUND_HAZE_H: number;
+  SIDEWALK_H: number;
+  CURB_COLOR: string;
+  ROAD_COLOR_TOP: string;
+  ROAD_COLOR_BOTTOM: string;
+  ROAD_DASH: [number, number];
+  REFLECTION_ALPHA: number;
+  POOL_ALPHA: number;
+  FURNITURE_RATIOS: {
+    lamp: number;
+    tree: number;
+    bench: number;
+    car: number;
+    empty: number;
+  };
+  WALKER_LANES: number;
+  WALKER_DEPTH_SCALE: { min: number; max: number };
 }
 
 export const WALKER_MIN_GROUP = 4;
@@ -67,13 +86,32 @@ export const WALKER_CAT_SPEED_MIN = 18;
 export const WALKER_CAT_SPEED_MAX = 26;
 export const WALKER_LANE_OFFSET = 14;
 export const WALKER_LANE_VARIATION = 4;
-export const WALKER_SPRITE_PX = 2.5;
+export const WALKER_SPRITE_PX = 3; // diperbesar dari 2.5 menjadi 3 untuk kejelasan visual
 export const WALKER_CAT_SIT_CHANCE = 0.25;
 export const WALKER_BOUNDS_MARGIN = 6;
 
 // Penanganan Ghost dan Backspace Cepat
 export const GHOST_FAST_COLLAPSE_DURATION = 150; // ms
 export const BUILDING_SPAWN_DELAY_ON_GHOST = 120; // ms
+
+// Konstanta Tanah Hidup, Trotoar, dan Perabot (FR-20)
+export const GROUND_HAZE_H = 16;
+export const SIDEWALK_H = 14;
+export const CURB_COLOR = "#2c3852";
+export const ROAD_COLOR_TOP = "#0b1021";
+export const ROAD_COLOR_BOTTOM = "#03060f";
+export const ROAD_DASH: [number, number] = [18, 18];
+export const REFLECTION_ALPHA = 0.08;
+export const POOL_ALPHA = 0.14;
+export const FURNITURE_RATIOS = {
+  lamp: 0.35,
+  tree: 0.20,
+  bench: 0.10,
+  car: 0.10,
+  empty: 0.25,
+};
+export const WALKER_LANES = 3;
+export const WALKER_DEPTH_SCALE = { min: 0.9, max: 1.15 };
 
 export const defaultConfig: Readonly<CityConfig> = {
   CELL: 11,
@@ -122,6 +160,18 @@ export const defaultConfig: Readonly<CityConfig> = {
   WALKER_SPRITE_PX,
   WALKER_CAT_SIT_CHANCE,
   WALKER_BOUNDS_MARGIN,
+
+  GROUND_HAZE_H,
+  SIDEWALK_H,
+  CURB_COLOR,
+  ROAD_COLOR_TOP,
+  ROAD_COLOR_BOTTOM,
+  ROAD_DASH,
+  REFLECTION_ALPHA,
+  POOL_ALPHA,
+  FURNITURE_RATIOS,
+  WALKER_LANES,
+  WALKER_DEPTH_SCALE,
 };
 
 // Singleton runtime config yang dapat dimodifikasi saat live preview (?tune=1)

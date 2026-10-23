@@ -81,3 +81,16 @@ Dokumen pelacakan status dan detail per fase implementasi Night City Typer.
   - Transisi zoom halus ~400 ms (`1 - Math.exp(-dt / 80)`).
   - Mengetik huruf baru, spasi, backspace, atau reset otomatis mengembalikan tampilan ke mode fokus gedung terbaru.
 
+---
+
+## Catatan Fitur Khusus: Tanah Hidup, Trotoar, Pantulan, dan Perabot Jalan (FR-20)
+
+- **Prioritas:** Should (Functional Requirement FR-20).
+- **Konsep:** Tanah kota tidak flat: memiliki kabut tipis di horizon, trotoar dengan pola paving dan curb, jalan dengan garis tengah putus-putus, kolam cahaya dan pantulan aspal basah di bawah tiap gedung, perabot jalan (lampu, pohon, bangku, mobil), serta karakter yang berjalan di 3 lajur trotoar dengan depth scaling dan gerak ekspresif.
+- **Teknis:**
+  - `lib/city/ground.ts`: fungsi murni `computeAdaptiveGround(viewportHeight, worldScale)` (menonaktifkan perabot & pantulan jika groundHeight < 60 CSS px), `getWalkerLaneY(laneIndex)` (3 lajur dalam trotoar), `getWalkerDepthScale(laneIndex)` (0.90 .. 1.15), dan `getBuildingFurniture(building, worldSeed)` (lampu 35%, pohon 20%, bangku 10%, mobil 10%, kosong 25%).
+  - `lib/render/ground.ts`: `drawGround` (kabut horizon 16 px, pola paving trotoar 28 px via `createPattern`, garis curb 1 px, gradien aspal jalan dan garis tengah putus-putus 36 px bergeser mengikuti cameraX), serta `drawReflectionsAndPools` (satu gradien per gedung, kolam trotoar POOL_ALPHA dan pantulan jalan basah REFLECTION_ALPHA + pantulan warna huruf 0.08).
+  - `lib/render/furniture.ts`: sprite offscreen Path2D yang di-cache (lampu jalan dengan glow & kolam cahaya, pohon pot, bangku kayu, siluet mobil parkir dengan lampu belakang merah).
+  - `lib/city/walkers.ts` & `lib/render/walkers.ts`: 3 lajur trotoar, akselerasi/deselerasi ~0.3s, step bobbing 1 px, kibasan ekor kucing `idle_wag`, tolehan manusia saat jeda, bayangan tegas, dan rim light. Menghormati `prefers-reduced-motion`.
+
+

@@ -224,25 +224,5 @@ export function drawMoon(
   }
 }
 
-export function drawGround(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  palette?: TimePalette
-): void {
-  const p = palette ?? TIME_PALETTES[0];
-  const groundY = height * 0.85;
-
-  // Dasar tanah gelap di 85% tinggi layar
-  ctx.fillStyle = `rgb(${p.ground[0]}, ${p.ground[1]}, ${p.ground[2]})`;
-  ctx.fillRect(0, groundY, width, height - groundY);
-
-  // Garis horizon tipis untuk aksen pemisah
-  ctx.strokeStyle = `rgba(${p.groundLine[0]}, ${p.groundLine[1]}, ${p.groundLine[2]}, ${p.groundLine[3].toFixed(3)})`;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, groundY);
-  ctx.lineTo(width, groundY);
-  ctx.stroke();
-}
+export { drawGround } from "./ground";
 

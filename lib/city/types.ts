@@ -56,6 +56,8 @@ export interface Building {
   cols?: number;
   extraFloors?: number;
   dominantHue?: "warm" | "cool";
+  spawnDelay?: number;
+  fastCollapse?: boolean;
 }
 
 export type SeparatorKind = "road" | "river" | "park";
@@ -67,12 +69,16 @@ export interface Separator {
   kind: SeparatorKind;
   progress: number;
   state?: "entering" | "alive" | "collapsing";
+  collapseTimer?: number;
+  fastCollapse?: boolean;
 }
 
 export type CityItem = Building | Separator;
+export type GhostItem = Building | Separator;
 
 export interface CityState {
   items: CityItem[];
+  ghosts: GhostItem[];
   cursorX: number;
   cameraX: number;
   cameraTarget: number;

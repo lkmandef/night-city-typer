@@ -376,6 +376,21 @@ export default function CityCanvas() {
           isItemVisible(b.x, b.width, cameraX, worldScreenWidth)
         );
 
+        // Filter ghosts yang terlihat di layar
+        const allGhostSeparators = (cityStateRef.current.ghosts ?? []).filter(
+          (item): item is Separator => "progress" in item
+        );
+        const visibleGhostSeparators = allGhostSeparators.filter((s) =>
+          isItemVisible(s.x, s.width, cameraX, worldScreenWidth)
+        );
+
+        const allGhostBuildings = (cityStateRef.current.ghosts ?? []).filter(
+          (item): item is Building => "windows" in item
+        );
+        const visibleGhostBuildings = allGhostBuildings.filter((b) =>
+          isItemVisible(b.x, b.width, cameraX, worldScreenWidth)
+        );
+
         // 3. Render pemandangan lengkap melalui pipeline
         renderScene({
           ctx,
@@ -388,6 +403,8 @@ export default function CityCanvas() {
           parallax: parallaxRef.current,
           visibleSeparators,
           visibleBuildings,
+          visibleGhostSeparators,
+          visibleGhostBuildings,
           time: currentTime,
           palette: currentPalette,
           walkers: walkersRef.current,

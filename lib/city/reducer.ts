@@ -1,7 +1,10 @@
-import type { CityAction, CityState, Separator, SeparatorKind } from "./types";
+import type { CityAction, CityState, GhostItem, Separator, SeparatorKind } from "./types";
 import { LETTER_BUILDING_GAP, makeBuilding } from "./buildings";
 import { mulberry32 } from "./rng";
-import { currentConfig } from "./config";
+import {
+  BUILDING_SPAWN_DELAY_ON_GHOST,
+  currentConfig,
+} from "./config";
 
 /**
  * State awal kota malam.
@@ -9,6 +12,7 @@ import { currentConfig } from "./config";
 export function createInitialCityState(seed = 12345): CityState {
   return {
     items: [],
+    ghosts: [],
     cursorX: 60,
     cameraX: 0,
     cameraTarget: 0,
@@ -19,6 +23,8 @@ export function createInitialCityState(seed = 12345): CityState {
 
 /**
  * Reducer murni untuk memproses aksi kota tanpa efek samping canvas atau React.
+ * Logika kota memisahkan `items` (model logis untuk tata letak dan teks)
+ * dari `ghosts` (elemen yang sedang runtuh/memudar untuk animasi visual).
  */
 export function cityReducer(state: CityState, action: CityAction): CityState {
   switch (action.type) {
@@ -31,9 +37,34 @@ export function cityReducer(state: CityState, action: CityAction): CityState {
       );
       const gap = building.gap ?? (building.glyph ? LETTER_BUILDING_GAP : 4);
       const nextCursorX = state.cursorX + building.width + gap;
+
+      // Cek apakah ada ghost di area x yang sama ([state.cursorX, nextCursorX])
+      const newX1 = state.cursorX;
+      const newX2 = nextCursorX;
+      let hasOverlappingGhost = false;
+
+      const nextGhosts = state.ghosts.map((ghost) => {
+        const gx1 = ghost.x;
+        const gx2 = ghost.x + ghost.width;
+        // Overlap jika kedua rentang saling memotong
+        if (gx1 < newX2 && gx2 > newX1) {
+          hasOverlappingGhost = true;
+          return {
+            ...ghost,
+            fastCollapse: true,
+          };
+        }
+        return ghost;
+      });
+
+      if (hasOverlappingGhost) {
+        building.spawnDelay = BUILDING_SPAWN_DELAY_ON_GHOST;
+      }
+
       return {
         ...state,
         items: [...state.items, building],
+        ghosts: nextGhosts,
         cursorX: nextCursorX,
       };
     }
@@ -66,6 +97,7 @@ export function cityReducer(state: CityState, action: CityAction): CityState {
                   (currentConfig.RIVER_PARK_MAX_WIDTH - currentConfig.RIVER_PARK_MIN_WIDTH)
             );
 
+      const nextCursorX = state.cursorX + width;
       const separator: Separator = {
         id: state.items.length,
         x: state.cursorX,
@@ -75,38 +107,50 @@ export function cityReducer(state: CityState, action: CityAction): CityState {
         state: "entering",
       };
 
+      // Cek apakah ada ghost di area pemisah baru
+      const nextGhosts = state.ghosts.map((ghost) => {
+        const gx1 = ghost.x;
+        const gx2 = ghost.x + ghost.width;
+        if (gx1 < nextCursorX && gx2 > state.cursorX) {
+          return {
+            ...ghost,
+            fastCollapse: true,
+          };
+        }
+        return ghost;
+      });
+
       return {
         ...state,
         items: [...state.items, separator],
-        cursorX: state.cursorX + width,
+        ghosts: nextGhosts,
+        cursorX: nextCursorX,
       };
     }
 
     case "BACKSPACE": {
       if (state.items.length === 0) return state;
 
-      // Cari item terakhir dari kanan yang BELUM collapsing
-      let targetIndex = -1;
-      for (let i = state.items.length - 1; i >= 0; i--) {
-        const item = state.items[i];
-        if (item.state !== "collapsing") {
-          targetIndex = i;
-          break;
-        }
-      }
-
-      // Jika semua item sudah collapsing atau kota kosong, abaikan tanpa error
-      if (targetIndex === -1) return state;
-
       const newItems = [...state.items];
-      newItems[targetIndex] = {
-        ...newItems[targetIndex],
+      const popped = newItems.pop()!;
+      const collapsingGhost: GhostItem = {
+        ...popped,
         state: "collapsing",
+        collapseTimer: 0,
       };
+
+      // Pastikan lampu huruf langsung padam pada ghost
+      if ("windows" in collapsingGhost) {
+        collapsingGhost.windows = collapsingGhost.windows.map((w) =>
+          w.isLetter ? { ...w, lit: false } : w
+        );
+      }
 
       return {
         ...state,
         items: newItems,
+        ghosts: [...state.ghosts, collapsingGhost],
+        cursorX: popped.x,
       };
     }
 
@@ -120,36 +164,40 @@ export function cityReducer(state: CityState, action: CityAction): CityState {
     }
 
     case "RESET": {
-      // Jika kota sudah kosong, kembalikan ke state awal
-      if (state.items.length === 0) {
+      if (state.items.length === 0 && state.ghosts.length === 0) {
         return {
           ...createInitialCityState(state.seed),
           timeOfDay: state.timeOfDay,
         };
       }
 
-      // Animasi runtuh beruntun cepat dari kanan ke kiri
+      // Animasi runtuh beruntun cepat dari kanan ke kiri untuk seluruh items yang tersisa
       const count = state.items.length;
-      const stepDelay = Math.min(30, Math.max(8, Math.floor(300 / count)));
+      const stepDelay = Math.min(30, Math.max(8, Math.floor(300 / Math.max(1, count))));
+
+      const newGhosts: GhostItem[] = state.items.map((item, index) => {
+        const reverseIdx = count - 1 - index;
+        if ("windows" in item) {
+          const windows = item.windows.map((w) => (w.isLetter ? { ...w, lit: false } : w));
+          return {
+            ...item,
+            windows,
+            state: "collapsing",
+            collapseTimer: -reverseIdx * stepDelay,
+          };
+        } else {
+          return {
+            ...item,
+            state: "collapsing",
+          };
+        }
+      });
 
       return {
         ...state,
-        items: state.items.map((item, index) => {
-          if (item.state === "collapsing") return item;
-          const reverseIdx = count - 1 - index;
-          if ("windows" in item) {
-            return {
-              ...item,
-              state: "collapsing",
-              collapseTimer: -reverseIdx * stepDelay,
-            };
-          } else {
-            return {
-              ...item,
-              state: "collapsing",
-            };
-          }
-        }),
+        items: [],
+        ghosts: [...state.ghosts, ...newGhosts],
+        cursorX: 60,
       };
     }
 

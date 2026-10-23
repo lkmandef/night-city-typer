@@ -19,6 +19,8 @@ export interface RenderPipelineOptions {
   parallax: ParallaxRenderer;
   visibleSeparators: Separator[];
   visibleBuildings: Building[];
+  visibleGhostSeparators?: Separator[];
+  visibleGhostBuildings?: Building[];
   time: number;
   palette?: TimePalette;
   walkers?: Walker[];
@@ -99,6 +101,15 @@ export function renderScene(options: RenderPipelineOptions): void {
   ctx.scale(worldScale, worldScale);
   ctx.translate(-cameraX, -groundY);
 
+  // Gambar ghosts (elemen yang sedang runtuh/memudar) di belakang item aktif
+  if (options.visibleGhostSeparators && options.visibleGhostSeparators.length > 0) {
+    drawSeparators(ctx, options.visibleGhostSeparators, groundY, time);
+  }
+  if (options.visibleGhostBuildings && options.visibleGhostBuildings.length > 0) {
+    drawBuildings(ctx, options.visibleGhostBuildings, groundY, time, palette?.windowLitFactor ?? 1.0);
+  }
+
+  // Gambar item aktif di depan
   drawSeparators(ctx, visibleSeparators, groundY, time);
   drawBuildings(ctx, visibleBuildings, groundY, time, palette?.windowLitFactor ?? 1.0);
   if (options.walkers && options.groups) {

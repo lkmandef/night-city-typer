@@ -2,7 +2,7 @@ import type { Building, BuildingKind, BuildingWindow, CityState, Separator } fro
 import { mulberry32 } from "./rng";
 import { applySilhouetteCap } from "./camera";
 import { getGlyph } from "./glyphs";
-import { currentConfig } from "./config";
+import { currentConfig, GHOST_FAST_COLLAPSE_DURATION } from "./config";
 
 // ==========================================
 // Konstanta Zona Huruf & Tata Letak Fasad
@@ -313,6 +313,14 @@ export function makeBuilding(
  * Memperbarui status animasi pertumbuhan, nyala jendela, atau runtuhnya gedung.
  */
 export function updateBuilding(building: Building, dt: number): void {
+  // 0. Tunda mulai tumbuh jika ada spawnDelay (agar tidak bertumpuk dengan ghost yang sedang runtuh cepat)
+  if (building.spawnDelay && building.spawnDelay > 0) {
+    building.spawnDelay -= dt;
+    if (building.spawnDelay > 0) {
+      return;
+    }
+  }
+
   if (building.state === "growing") {
     // Tumbuh dari 0 ke 1 selama sekitar 600 ms
     building.grow = Math.min(1, building.grow + dt / 600);
@@ -343,29 +351,40 @@ export function updateBuilding(building: Building, dt: number): void {
     }
   }
 
-  // Animasi runtuh (collapsing) saat tombol backspace ditekan
+  // Animasi runtuh (collapsing)
   if (building.state === "collapsing") {
     building.collapseTimer = (building.collapseTimer ?? 0) + dt;
 
-    // 1. Huruf padam lebih dulu sebelum gedung runtuh
+    // 1. Huruf padam seketika
     for (const win of building.windows) {
       if (win.isLetter) {
         win.lit = false;
       }
     }
 
-    // 2. Jendela lain padam berurutan dari atas ke bawah selama ~200 ms
-    const maxRow = building.windows.reduce((max, w) => Math.max(max, w.row), 0);
-    const fadeRatio = Math.min(1, building.collapseTimer / 200);
-    for (const win of building.windows) {
-      if (!win.isLetter && win.row >= Math.floor((1 - fadeRatio) * (maxRow + 1))) {
+    if (building.fastCollapse) {
+      // Keruntuhan dipercepat (150 ms) jika ada elemen baru yang menempati posisinya
+      building.collapse = Math.min(
+        1,
+        Math.max(0, building.collapseTimer) / GHOST_FAST_COLLAPSE_DURATION
+      );
+      for (const win of building.windows) {
         win.lit = false;
       }
-    }
+    } else {
+      // 2. Jendela lain padam berurutan dari atas ke bawah selama ~200 ms
+      const maxRow = building.windows.reduce((max, w) => Math.max(max, w.row), 0);
+      const fadeRatio = Math.min(1, Math.max(0, building.collapseTimer) / 200);
+      for (const win of building.windows) {
+        if (!win.isLetter && win.row >= Math.floor((1 - fadeRatio) * (maxRow + 1))) {
+          win.lit = false;
+        }
+      }
 
-    // 3. Collapse gedung naik dari 0 ke 1 selama ~700 ms
-    if (building.collapseTimer > 150) {
-      building.collapse = Math.min(1, (building.collapseTimer - 150) / 700);
+      // 3. Collapse gedung naik dari 0 ke 1 selama ~700 ms setelah tunda 150 ms
+      if (building.collapseTimer > 150) {
+        building.collapse = Math.min(1, (building.collapseTimer - 150) / 700);
+      }
     }
   }
 }
@@ -380,14 +399,16 @@ export function updateSeparator(sep: Separator, dt: number): void {
       sep.state = "alive";
     }
   } else if (sep.state === "collapsing") {
-    sep.progress = Math.max(0, sep.progress - dt / 300);
+    const duration = sep.fastCollapse ? GHOST_FAST_COLLAPSE_DURATION : 300;
+    sep.progress = Math.max(0, sep.progress - dt / duration);
   }
 }
 
 /**
- * Memperbarui seluruh item di dalam kota serta menghapus item yang sudah selesai runtuh.
+ * Memperbarui seluruh item aktif dan ghost di dalam kota serta membersihkan ghost yang selesai runtuh.
  */
 export function updateCity(state: CityState, dt: number, initialCursorX = 60): void {
+  // 1. Update item aktif
   for (const item of state.items) {
     if ("windows" in item) {
       updateBuilding(item, dt);
@@ -396,39 +417,31 @@ export function updateCity(state: CityState, dt: number, initialCursorX = 60): v
     }
   }
 
+  // 2. Update ghost item (gedung/pemisah runtuh)
+  if (state.ghosts && state.ghosts.length > 0) {
+    for (const ghost of state.ghosts) {
+      if ("windows" in ghost) {
+        updateBuilding(ghost, dt);
+      } else {
+        updateSeparator(ghost, dt);
+      }
+    }
+
+    // Bersihkan ghost yang sudah selesai runtuh
+    state.ghosts = state.ghosts.filter((ghost) => {
+      if ("windows" in ghost) {
+        return ghost.collapse < 1;
+      } else {
+        return ghost.progress > 0;
+      }
+    });
+  }
+
   // Batasi item aktif maksimal 200, sisanya dipadatkan jadi siluet
   applySilhouetteCap(state.items, 200);
 
-  // Hapus item dari ujung kanan jika sudah selesai runtuh
-  let removedAny = false;
-  while (state.items.length > 0) {
-    const last = state.items[state.items.length - 1];
-    const isFinishedBuilding =
-      "windows" in last && last.state === "collapsing" && last.collapse >= 1;
-    const isFinishedSeparator =
-      "progress" in last && last.state === "collapsing" && last.progress <= 0;
-
-    if (isFinishedBuilding || isFinishedSeparator) {
-      state.items.pop();
-      removedAny = true;
-    } else {
-      break;
-    }
-  }
-
-  // Kembalikan posisi cursorX ke ujung item terakhir setelah penghapusan
-  if (removedAny) {
-    if (state.items.length === 0) {
-      state.cursorX = initialCursorX;
-    } else {
-      const last = state.items[state.items.length - 1];
-      const gap =
-        "gap" in last && last.gap !== undefined
-          ? last.gap
-          : "glyph" in last && last.glyph
-          ? LETTER_BUILDING_GAP
-          : ("windows" in last ? 4 : 0);
-      state.cursorX = last.x + last.width + gap;
-    }
+  // Jika items kosong, posisikan cursorX ke initialCursorX
+  if (state.items.length === 0) {
+    state.cursorX = initialCursorX;
   }
 }

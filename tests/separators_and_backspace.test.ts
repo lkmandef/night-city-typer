@@ -43,13 +43,16 @@ describe("Separators & Backspace (Fase 4)", () => {
     expect(state.items).toHaveLength(3);
     expect(state.cursorX).toBeGreaterThan(initialCursor);
 
-    // 2. Beri 3 kali backspace (mengantrekan status collapsing)
+    // 2. Beri 3 kali backspace (memindahkan item ke ghosts seketika)
     state = cityReducer(state, { type: "BACKSPACE" });
     state = cityReducer(state, { type: "BACKSPACE" });
     state = cityReducer(state, { type: "BACKSPACE" });
 
-    // Semua item sekarang berstatus collapsing
-    expect(state.items.every((it) => it.state === "collapsing")).toBe(true);
+    // Items langsung kosong dan cursorX langsung kembali ke awal
+    expect(state.items).toHaveLength(0);
+    expect(state.cursorX).toBe(initialCursor);
+    expect(state.ghosts).toHaveLength(3);
+    expect(state.ghosts.every((it) => it.state === "collapsing")).toBe(true);
 
     // 3. Jalankan loop animasi runtuh (~1000ms cukup untuk menyelesaikan collapse 700ms)
     // Gunakan beberapa langkah frame 50ms
@@ -57,8 +60,9 @@ describe("Separators & Backspace (Fase 4)", () => {
       updateCity(state, 50, initialCursor);
     }
 
-    // 4. Setelah selesai runtuh, seluruh item harus terhapus dan cursorX kembali ke awal
+    // 4. Setelah selesai runtuh, seluruh ghost harus terhapus dan cursorX tetap di awal
     expect(state.items).toHaveLength(0);
+    expect(state.ghosts).toHaveLength(0);
     expect(state.cursorX).toBe(initialCursor);
   });
 
@@ -71,9 +75,11 @@ describe("Separators & Backspace (Fase 4)", () => {
     state = cityReducer(state, { type: "SPACE" });
     expect(state.items).toHaveLength(2);
 
-    // Tekan backspace pada separator
+    // Tekan backspace pada separator: separator dipindahkan ke ghosts seketika
     state = cityReducer(state, { type: "BACKSPACE" });
-    expect(state.items[1].state).toBe("collapsing");
+    expect(state.items).toHaveLength(1);
+    expect(state.ghosts).toHaveLength(1);
+    expect(state.ghosts[0].state).toBe("collapsing");
 
     // Jalankan update sampai separator terhapus (300ms cukup)
     for (let t = 0; t < 10; t++) {
@@ -82,6 +88,7 @@ describe("Separators & Backspace (Fase 4)", () => {
 
     // Separator terhapus, tersisa 1 gedung
     expect(state.items).toHaveLength(1);
+    expect(state.ghosts).toHaveLength(0);
     expect("windows" in state.items[0]).toBe(true);
   });
 

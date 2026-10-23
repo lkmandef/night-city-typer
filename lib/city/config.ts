@@ -71,6 +71,10 @@ export const WALKER_SPRITE_PX = 2.5;
 export const WALKER_CAT_SIT_CHANCE = 0.25;
 export const WALKER_BOUNDS_MARGIN = 6;
 
+// Penanganan Ghost dan Backspace Cepat
+export const GHOST_FAST_COLLAPSE_DURATION = 150; // ms
+export const BUILDING_SPAWN_DELAY_ON_GHOST = 120; // ms
+
 export const defaultConfig: Readonly<CityConfig> = {
   CELL: 11,
   PODIUM_ROWS: 5,

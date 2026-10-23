@@ -41,11 +41,13 @@ describe("UI & Feature Polish (Fase 7)", () => {
     state = cityReducer(state, { type: "TYPE_CHAR", char: "a" });
     expect(state.items).toHaveLength(4);
 
-    // Pemicu RESET
+    // Pemicu RESET: items langsung dikosongkan seketika, gedung dipindahkan ke ghosts
     state = cityReducer(state, { type: "RESET" });
 
-    // Semua item harus berstatus collapsing dengan stagger
-    expect(state.items.every((it) => it.state === "collapsing")).toBe(true);
+    // Items langsung kosong, ghosts berisi seluruh gedung runtuh
+    expect(state.items).toHaveLength(0);
+    expect(state.ghosts).toHaveLength(4);
+    expect(state.ghosts.every((it) => it.state === "collapsing")).toBe(true);
 
     // Jalankan loop animasi hingga seluruh gedung selesai runtuh
     for (let t = 0; t < 35; t++) {
@@ -54,6 +56,7 @@ describe("UI & Feature Polish (Fase 7)", () => {
 
     // Kota sekarang harus bersih dan cursorX kembali ke awal
     expect(state.items).toHaveLength(0);
+    expect(state.ghosts).toHaveLength(0);
     expect(state.cursorX).toBe(initialCursor);
   });
 

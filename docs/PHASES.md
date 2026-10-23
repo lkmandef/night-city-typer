@@ -56,3 +56,28 @@ Dokumen pelacakan status dan detail per fase implementasi Night City Typer.
   - Fungsi murni `getLetterColor(setting, indexGedung)` dan `getGlowColor(hex, alpha)`.
   - Persistensi di `localStorage` (`nct:letter-color`) dan parameter URL `?warna=<id>`.
   - Kontras hangat: jika hue 20°-55° (emas, oranye), kecerahan jendela non-huruf di zona huruf dikalikan 0.7 dan saturasi diturunkan 30%.
+
+---
+
+## Catatan Fitur Khusus: Teks Ketikan Selalu Terlihat (FR-18)
+
+- **Prioritas:** Must (Functional Requirement FR-18).
+- **Konsep:** Pengunjung dapat membaca teks yang sedang mereka ketik meskipun kalimat sangat panjang dan gedung-gedung awal sudah tergeser keluar dari layar oleh kamera.
+- **Teknis:**
+  - Fungsi murni `buildTypedText(items)` di `lib/city/text.ts` menggabungkan karakter aktif gedung berglyph dan spasi dari pemisah (tanpa ghost).
+  - Fungsi murni `tailText(text, max)` menampilkan akhiran teks dengan awalan "…" jika melebihi panjang maksimum.
+  - Komponen `components/TypedTextOverlay.tsx` berupa pil kaca semi-transparan di tengah bawah layar (font serif Playfair, safe-area aware, debounced sr-only live region 500 ms, kursor berkedip menghormati reduced-motion).
+
+---
+
+## Catatan Fitur Khusus: Mode Ringkasan Seluruh Kota (FR-19)
+
+- **Prioritas:** Should (Functional Requirement FR-19).
+- **Konsep:** Pengunjung dapat melihat seluruh panorama kota dari awal sampai akhir tanpa terpotong batas viewport.
+- **Teknis:**
+  - Tombol "Lihat semua" di Toolbar dengan `preventDefault` pada pointerdown agar tidak merebut fokus keyboard.
+  - Perhitungan zoom `zoomFactor = clamp(0.9 * lebarViewport / lebarTotalKota, 0.2, 1.0)` di `lib/city/text.ts`.
+  - Kamera berpusat di titik tengah rentang gedung kota (`cityCenterX - worldScreenWidth / 2`).
+  - Transisi zoom halus ~400 ms (`1 - Math.exp(-dt / 80)`).
+  - Mengetik huruf baru, spasi, backspace, atau reset otomatis mengembalikan tampilan ke mode fokus gedung terbaru.
+

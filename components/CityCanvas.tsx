@@ -24,6 +24,8 @@ import {
 import { updateConfig } from "@/lib/city/config";
 import { computeGroups, type BuildingGroup } from "@/lib/city/groups";
 import { updateWalkers, type Walker } from "@/lib/city/walkers";
+import { buildTypedText, computeOverviewZoom } from "@/lib/city/text";
+import TypedTextOverlay from "@/components/TypedTextOverlay";
 import HiddenInput, { type InputDebugInfo } from "@/components/HiddenInput";
 import TuningPanel from "@/components/TuningPanel";
 import HintOverlay from "@/components/HintOverlay";
@@ -65,6 +67,11 @@ export default function CityCanvas() {
   const wasEmptyRef = useRef(true);
   const [timePhaseName, setTimePhaseName] = useState("Malam");
   const [walkerCount, setWalkerCount] = useState<number>(0);
+  const [typedText, setTypedText] = useState<string>("");
+  const [isOverviewMode, setIsOverviewMode] = useState(false);
+  const isOverviewModeRef = useRef(false);
+  const currentZoomRef = useRef(1);
+  const targetZoomRef = useRef(1);
 
   // Baca preferensi warna via useSyncExternalStore (client-side murni, bebas hydration mismatch)
   const selectedColorId = useSyncExternalStore(
@@ -148,6 +155,21 @@ export default function CityCanvas() {
       // Perbarui state kota di ref (tanpa re-render React)
       const nextState = cityReducer(cityStateRef.current, action);
       cityStateRef.current = nextState;
+
+      // Update string teks yang diketik untuk overlay
+      setTypedText(buildTypedText(nextState.items));
+
+      // Mengetik atau aksi tombol apapun mengembalikan kamera dari mode ringkasan ke fokus gedung
+      if (
+        (action.type === "TYPE_CHAR" ||
+          action.type === "SPACE" ||
+          action.type === "BACKSPACE" ||
+          action.type === "RESET") &&
+        isOverviewModeRef.current
+      ) {
+        isOverviewModeRef.current = false;
+        setIsOverviewMode(false);
+      }
 
       // Tangani aksi RESET: buat semua walker exit cepat (300 ms)
       if (action.type === "RESET") {
@@ -300,11 +322,37 @@ export default function CityCanvas() {
       lastTime = currentTime;
 
       const { width, height } = sizeRef.current;
-      const worldScale = computeWorldScale(width);
-      const worldScreenWidth = width > 0 ? width / worldScale : 1;
+      const baseWorldScale = computeWorldScale(width);
+      const items = cityStateRef.current.items;
 
-      // 1. Update target dan lerp kamera mengikuti gedung terbaru
-      const targetX = computeCameraTarget(cityStateRef.current.cursorX, worldScreenWidth);
+      // Hitung rentang kota untuk mode tinjauan (Overview Mode FR-19)
+      const firstX = items.length > 0 ? items[0].x : 60;
+      const lastX = items.length > 0 ? items[items.length - 1].x + items[items.length - 1].width : 60;
+      const totalCityWidth = Math.max(1, lastX - firstX);
+      const cityCenterX = firstX + totalCityWidth / 2;
+
+      if (isOverviewModeRef.current && items.length > 0) {
+        const { zoomFactor } = computeOverviewZoom(totalCityWidth, width, baseWorldScale);
+        targetZoomRef.current = zoomFactor;
+      } else {
+        targetZoomRef.current = 1.0;
+      }
+
+      // Transisi zoom halus ~400 ms
+      const zoomEase = 1 - Math.exp(-dt / 80);
+      currentZoomRef.current += (targetZoomRef.current - currentZoomRef.current) * zoomEase;
+
+      const effectiveScale = baseWorldScale * currentZoomRef.current;
+      const worldScreenWidth = width > 0 ? width / effectiveScale : 1;
+
+      // 1. Update target dan lerp kamera (berpusat di tengah kota jika mode tinjauan, atau ikuti gedung terbaru)
+      let targetX: number;
+      if (isOverviewModeRef.current && items.length > 0) {
+        targetX = cityCenterX - worldScreenWidth / 2;
+      } else {
+        targetX = computeCameraTarget(cityStateRef.current.cursorX, worldScreenWidth);
+      }
+
       cityStateRef.current.cameraTarget = targetX;
       cityStateRef.current.cameraX = updateCamera(
         cityStateRef.current.cameraX,
@@ -437,8 +485,8 @@ export default function CityCanvas() {
           width,
           height,
           groundY,
-          worldScale,
-          cameraX,
+          worldScale: effectiveScale,
+          cameraX: cityStateRef.current.cameraX,
           stars: starsRef.current,
           parallax: parallaxRef.current,
           visibleSeparators,
@@ -456,7 +504,7 @@ export default function CityCanvas() {
         if (isDebug && Math.floor(currentTime) % 10 === 0) {
           setWalkerCount(walkersRef.current.length);
           setCameraDebugInfo(
-            `FPS: ${fpsRef.current} | Bulan Δmax: ${maxMoonDelta5sRef.current.toFixed(2)}px | Cam: ${Math.round(cameraX)} | Skala: ${worldScale.toFixed(2)} | Vis: ${visibleBuildings.length}/${allBuildings.length} | Walkers: ${walkersRef.current.length} (${groups.length} grp) | Waktu: ${currentPalette.phaseName}`
+            `FPS: ${fpsRef.current} | Bulan Δmax: ${maxMoonDelta5sRef.current.toFixed(2)}px | Cam: ${Math.round(cityStateRef.current.cameraX)} | Skala: ${effectiveScale.toFixed(2)} | Vis: ${visibleBuildings.length}/${allBuildings.length} | Walkers: ${walkersRef.current.length} (${groups.length} grp) | Waktu: ${currentPalette.phaseName}`
           );
         }
       }
@@ -487,6 +535,7 @@ export default function CityCanvas() {
         onDebugChange={setInputDebug}
       />
       <HintOverlay visible={isCityEmpty} />
+      <TypedTextOverlay text={typedText} />
       <Toolbar
         onSavePng={handleSavePng}
         onReset={handleReset}
@@ -494,6 +543,14 @@ export default function CityCanvas() {
         timePhaseName={timePhaseName}
         selectedColorId={selectedColorId}
         onSelectColor={handleSelectColor}
+        isOverviewMode={isOverviewMode}
+        onToggleOverview={() => {
+          setIsOverviewMode((prev) => {
+            const next = !prev;
+            isOverviewModeRef.current = next;
+            return next;
+          });
+        }}
       />
       <TuningPanel />
       {isDebug && (

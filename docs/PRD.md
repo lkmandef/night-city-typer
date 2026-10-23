@@ -75,6 +75,8 @@ Portofolio developer sering berisi project yang mirip (to-do list, e-commerce, d
 | FR-15 | Huruf yang diketik tampil sebagai jendela putih murni pada fasad gedung yang penuh jendela hidup (kriteria penerimaan: kata 5 huruf terbaca di desktop 1440 px dan HP 390 px tanpa kotak gelap) | Must |
 | FR-16 | Setiap kelompok 4 sampai 7 gedung bersebelahan memiliki satu karakter yang berjalan di tanah di depannya dan tidak keluar dari rentang kelompok itu | Should |
 | FR-17 | Pengunjung dapat mengganti warna huruf lewat menu warna | Should |
+| FR-18 | Teks yang diketik selalu terlihat (TypedTextOverlay) | Must |
+| FR-19 | Pengunjung dapat melihat seluruh kota (Mode ringkasan "Lihat semua") | Should |
 
 ### 2.7 Non-Functional Requirements
 

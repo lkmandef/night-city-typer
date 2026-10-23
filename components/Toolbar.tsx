@@ -10,6 +10,8 @@ interface ToolbarProps {
   timePhaseName?: string;
   selectedColorId?: string;
   onSelectColor?: (colorId: string) => void;
+  isOverviewMode?: boolean;
+  onToggleOverview?: () => void;
 }
 
 export default function Toolbar({
@@ -19,6 +21,8 @@ export default function Toolbar({
   timePhaseName = "Malam",
   selectedColorId = "putih",
   onSelectColor,
+  isOverviewMode = false,
+  onToggleOverview,
 }: ToolbarProps) {
   const [isColorMenuOpen, setIsColorMenuOpen] = useState(false);
   const colorMenuRef = useRef<HTMLDivElement>(null);
@@ -165,6 +169,44 @@ export default function Toolbar({
             />
           </svg>
           <span className="hidden sm:inline font-sans text-white/90">{timePhaseName}</span>
+        </button>
+
+        {/* Tombol Lihat Semua (Overview Mode FR-19) */}
+        <button
+          type="button"
+          tabIndex={0}
+          aria-pressed={isOverviewMode}
+          aria-label={isOverviewMode ? "Kembali ke fokus gedung" : "Lihat seluruh panorama kota"}
+          title={isOverviewMode ? "Kembali ke mode fokus gedung" : "Lihat seluruh kota"}
+          onPointerDown={handlePointerDown}
+          onKeyDown={handleKeyDown}
+          onClick={() => {
+            onToggleOverview?.();
+            refocusInput();
+          }}
+          className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none ${
+            isOverviewMode
+              ? "bg-cyan-500/25 text-cyan-200 border border-cyan-400/40"
+              : "bg-white/5 hover:bg-white/15 active:bg-white/20 text-white/90"
+          }`}
+        >
+          <svg
+            className="w-3.5 h-3.5 text-cyan-300"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.8}
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"
+            />
+          </svg>
+          <span className="hidden sm:inline font-sans">
+            {isOverviewMode ? "Fokus" : "Lihat semua"}
+          </span>
         </button>
 
         {/* Tombol Simpan PNG */}

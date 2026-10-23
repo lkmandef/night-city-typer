@@ -30,9 +30,12 @@ export interface CityConfig {
 
   // Warna & Glow Huruf
   LETTER_COLOR: string; // Warna piksel huruf ("#ffffff")
+  letterColorId: string; // Id preset warna huruf ("putih", "emas", dsb) atau "rainbow"
   LETTER_GLOW_COLOR: string; // Warna glow huruf
   LETTER_GLOW_OPACITY: number; // Opacity radial glow per huruf (0.22)
   LETTER_GLOW_RADIUS_MULT: number; // Ukuran glow relatif terhadap tinggi huruf (1.6x)
+  WARM_ZONE_BRIGHTNESS_MULT: number; // Pengali kecerahan non-huruf di zona huruf jika warna huruf hangat (0.7)
+  WARM_ZONE_SATURATION_MULT: number; // Pengali saturasi non-huruf di zona huruf jika warna huruf hangat (0.7)
 
   // Pemisah (Separators)
   RIVER_PARK_MIN_WIDTH: number; // Lebar minimum sungai dan taman (70 px)
@@ -64,9 +67,12 @@ export const defaultConfig: Readonly<CityConfig> = {
   ACCENT_BRIGHTNESS_MAX: 0.4,
 
   LETTER_COLOR: "#ffffff",
+  letterColorId: "putih",
   LETTER_GLOW_COLOR: "rgba(210, 230, 255, 0.22)",
   LETTER_GLOW_OPACITY: 0.22,
   LETTER_GLOW_RADIUS_MULT: 1.6,
+  WARM_ZONE_BRIGHTNESS_MULT: 0.7,
+  WARM_ZONE_SATURATION_MULT: 0.7,
 
   RIVER_PARK_MIN_WIDTH: 70,
   RIVER_PARK_MAX_WIDTH: 110,

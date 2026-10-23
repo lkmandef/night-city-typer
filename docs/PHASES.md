@@ -32,3 +32,15 @@ Dokumen pelacakan status dan detail per fase implementasi Night City Typer.
   - Jendela lain di dalam zona huruf dipadamkan untuk kontras maksimal.
   - Animasi menyala bertahap (kiri ke kanan, jeda 20-40 ms per jendela) setelah gedung selesai tumbuh (`grow >= 1`).
   - Saat backspace, huruf padam seketika sebelum badan gedung runtuh.
+
+---
+
+## Catatan Fitur Khusus: Pemilih Warna Huruf (FR-17)
+
+- **Prioritas:** Should (Functional Requirement FR-17).
+- **Konsep:** Pengunjung dapat mengganti warna huruf pada fasad gedung melalui menu warna di toolbar.
+- **Teknis:**
+  - Preset warna di `lib/city/palette.ts`: putih (`#ffffff`), emas (`#ffd24a`), cyan (`#5ff3ff`), hijau (`#6dff9c`), pink (`#ff6fb5`), ungu (`#b58cff`), merah (`#ff5a5a`), oranye (`#ff9a3c`), serta mode dinamis `"rainbow"`.
+  - Fungsi murni `getLetterColor(setting, indexGedung)` dan `getGlowColor(hex, alpha)`.
+  - Persistensi di `localStorage` (`nct:letter-color`) dan parameter URL `?warna=<id>`.
+  - Kontras hangat: jika hue 20°-55° (emas, oranye), kecerahan jendela non-huruf di zona huruf dikalikan 0.7 dan saturasi diturunkan 30%.

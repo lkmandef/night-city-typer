@@ -2,6 +2,7 @@ import type { Building } from "@/lib/city/types";
 import { easeOutCubic } from "@/lib/utils/easing";
 import { currentConfig } from "@/lib/city/config";
 import { CELL, PODIUM_ROWS } from "@/lib/city/buildings";
+import { getGlowColor, getHueFromColor, getLetterColor } from "@/lib/city/palette";
 
 // ==========================================
 // Konstanta Visual Zona Huruf & Jendela
@@ -67,6 +68,9 @@ export function drawBuilding(
 
     const baseOpacity = currentConfig.LETTER_GLOW_OPACITY * flash * glowFade;
 
+    const letterSetting = currentConfig.letterColorId || currentConfig.LETTER_COLOR || "putih";
+    const letterColor = getLetterColor(letterSetting, building.id);
+
     const letterGlow = ctx.createRadialGradient(
       glowCenterX,
       glowCenterY,
@@ -75,12 +79,12 @@ export function drawBuilding(
       glowCenterY,
       glowRadius
     );
-    letterGlow.addColorStop(0, `rgba(210, 230, 255, ${Math.min(1, baseOpacity * 1.2)})`);
+    letterGlow.addColorStop(0, getGlowColor(letterColor, Math.min(1, baseOpacity * 1.2)));
     letterGlow.addColorStop(
       0.5,
-      `rgba(180, 215, 255, ${Math.min(1, baseOpacity * 0.45)})`
+      getGlowColor(letterColor, Math.min(1, baseOpacity * 0.45))
     );
-    letterGlow.addColorStop(1, "rgba(160, 200, 255, 0)");
+    letterGlow.addColorStop(1, getGlowColor(letterColor, 0));
 
     ctx.fillStyle = letterGlow;
     ctx.fillRect(
@@ -158,6 +162,11 @@ export function drawBuilding(
     // -------------------------------------------------------------------------
     // A. Gedung Berhuruf: SATU grid terpadu dari podium sampai atap
     // -------------------------------------------------------------------------
+    const letterSetting = currentConfig.letterColorId || currentConfig.LETTER_COLOR || "putih";
+    const letterColor = getLetterColor(letterSetting, building.id);
+    const letterHue = getHueFromColor(letterColor);
+    const isWarmLetter = letterHue >= 20 && letterHue <= 55;
+
     const litLetterRects: Rect[] = [];
     const litColoredWindows: { rect: Rect; color: string }[] = [];
     const unlitRects: Rect[] = [];
@@ -172,7 +181,7 @@ export function drawBuilding(
 
       if (win.isLetter) {
         if (win.lit) {
-          // Piksel huruf: warna putih murni (#ffffff) dan sedikit lebih besar (10x10 px, gap 1 px)
+          // Piksel huruf: warna terpilih dan sedikit lebih besar (10x10 px, gap 1 px)
           litLetterRects.push({
             x: cellX + 0.5,
             y: cellY + 0.5,
@@ -219,8 +228,24 @@ export function drawBuilding(
                 (win.rawBrightnessRand ?? 0.5) *
                   (currentConfig.ZONE_BRIGHTNESS_MAX - currentConfig.ZONE_BRIGHTNESS_MIN);
 
+              // Jika huruf berwarna hangat (emas/oranye), turunkan kecerahan agar huruf menonjol
+              if (isWarmLetter) {
+                b *= currentConfig.WARM_ZONE_BRIGHTNESS_MULT;
+              }
+
               // Warna mono dominan
               rgb = dominantHue === "warm" ? [242, 169, 59] : [63, 143, 208];
+
+              // Jika huruf berwarna hangat, turunkan saturasi non-huruf sekitar 30%
+              if (isWarmLetter) {
+                const gray = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2];
+                const satMult = currentConfig.WARM_ZONE_SATURATION_MULT;
+                rgb = [
+                  Math.round(rgb[0] * satMult + gray * (1 - satMult)),
+                  Math.round(rgb[1] * satMult + gray * (1 - satMult)),
+                  Math.round(rgb[2] * satMult + gray * (1 - satMult)),
+                ];
+              }
             } else {
               // Di luar zona huruf: 75% warna dominan, 25% warna dasar lain, maks 2% aksen teal/magenta
               b =
@@ -292,9 +317,9 @@ export function drawBuilding(
       ctx.fillRect(item.rect.x, item.rect.y, item.rect.w, item.rect.h);
     }
 
-    // 3. Piksel huruf menyala: jendela putih murni (#ffffff)
+    // 3. Piksel huruf menyala: jendela dengan warna huruf terpilih
     if (litLetterRects.length > 0) {
-      fillRects(litLetterRects, currentConfig.LETTER_COLOR);
+      fillRects(litLetterRects, letterColor);
     }
   } else if (building.windows.length > 0) {
     // -------------------------------------------------------------------------

@@ -16,6 +16,12 @@ import { renderScene } from "@/lib/render/pipeline";
 import { interpolatePalette, TIME_PALETTES } from "@/lib/render/sky";
 import { exportCanvasToPng } from "@/lib/render/exportPng";
 import { easeInOutCubic } from "@/lib/utils/easing";
+import {
+  loadSavedLetterColor,
+  saveLetterColor,
+  subscribeLetterColor,
+} from "@/lib/city/palette";
+import { updateConfig } from "@/lib/city/config";
 import HiddenInput, { type InputDebugInfo } from "@/components/HiddenInput";
 import TuningPanel from "@/components/TuningPanel";
 import HintOverlay from "@/components/HintOverlay";
@@ -44,6 +50,18 @@ export default function CityCanvas() {
   const [isCityEmpty, setIsCityEmpty] = useState(true);
   const wasEmptyRef = useRef(true);
   const [timePhaseName, setTimePhaseName] = useState("Malam");
+
+  // Baca preferensi warna via useSyncExternalStore (client-side murni, bebas hydration mismatch)
+  const selectedColorId = useSyncExternalStore(
+    subscribeLetterColor,
+    () => loadSavedLetterColor(),
+    () => "putih"
+  );
+
+  // Sinkronkan ke runtime config saat selectedColorId berubah
+  useEffect(() => {
+    updateConfig({ letterColorId: selectedColorId });
+  }, [selectedColorId]);
 
   const timeTransitionRef = useRef({
     fromPhase: 0,
@@ -155,6 +173,14 @@ export default function CityCanvas() {
       document.getElementById("city-full-input")?.focus();
     }
   }, [handleAction]);
+
+  const handleSelectColor = useCallback((colorId: string) => {
+    saveLetterColor(colorId);
+    updateConfig({ letterColorId: colorId });
+    if (typeof document !== "undefined") {
+      document.getElementById("city-full-input")?.focus();
+    }
+  }, []);
 
   // Tangani event keyboard desktop (diabaikan jika HiddenInput sedang fokus)
   useEffect(() => {
@@ -349,6 +375,8 @@ export default function CityCanvas() {
         onReset={handleReset}
         onEnter={handleEnter}
         timePhaseName={timePhaseName}
+        selectedColorId={selectedColorId}
+        onSelectColor={handleSelectColor}
       />
       <TuningPanel />
       {isDebug && (

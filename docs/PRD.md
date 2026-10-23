@@ -73,6 +73,7 @@ Portofolio developer sering berisi project yang mirip (to-do list, e-commerce, d
 | FR-13 | Suara ambient dan bunyi ketik halus (bisa dimatikan) | Could |
 | FR-14 | Dukungan prefers-reduced-motion | Should |
 | FR-15 | Huruf yang diketik tampil sebagai jendela putih murni pada fasad gedung yang penuh jendela hidup (kriteria penerimaan: kata 5 huruf terbaca di desktop 1440 px dan HP 390 px tanpa kotak gelap) | Must |
+| FR-17 | Pengunjung dapat mengganti warna huruf lewat menu warna | Should |
 
 ### 2.7 Non-Functional Requirements
 

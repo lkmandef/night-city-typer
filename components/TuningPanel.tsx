@@ -245,14 +245,25 @@ export default function TuningPanel() {
             <div className="flex items-center gap-1.5">
               <input
                 type="color"
-                value={config.LETTER_COLOR}
+                value={
+                  config.letterColorId && config.letterColorId.startsWith("#")
+                    ? config.letterColorId
+                    : config.LETTER_COLOR
+                }
                 onChange={(e) => {
-                  updateConfig({ LETTER_COLOR: e.target.value });
+                  updateConfig({
+                    LETTER_COLOR: e.target.value,
+                    letterColorId: e.target.value,
+                  });
                   keepTypingFocus();
                 }}
                 className="h-6 w-8 cursor-pointer rounded border border-white/30 bg-transparent p-0"
               />
-              <span className="text-[11px] text-slate-300">{config.LETTER_COLOR}</span>
+              <span className="text-[11px] text-slate-300">
+                {config.letterColorId && config.letterColorId.startsWith("#")
+                  ? config.letterColorId
+                  : config.LETTER_COLOR}
+              </span>
             </div>
           </div>
 

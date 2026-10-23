@@ -22,6 +22,8 @@ import {
   subscribeLetterColor,
 } from "@/lib/city/palette";
 import { updateConfig } from "@/lib/city/config";
+import { computeGroups, type BuildingGroup } from "@/lib/city/groups";
+import { updateWalkers, type Walker } from "@/lib/city/walkers";
 import HiddenInput, { type InputDebugInfo } from "@/components/HiddenInput";
 import TuningPanel from "@/components/TuningPanel";
 import HintOverlay from "@/components/HintOverlay";
@@ -46,10 +48,17 @@ export default function CityCanvas() {
   const cityStateRef = useRef<CityState>(createInitialCityState());
   const starsRef = useRef(generateStars(140, 8888));
   const parallaxRef = useRef(createParallaxRenderer());
+  const walkersRef = useRef<Walker[]>([]);
+  const groupsRef = useRef<BuildingGroup[]>([]);
+  const reducedMotionRef = useRef(false);
+  const frameCountRef = useRef(0);
+  const lastFpsTimeRef = useRef(0);
+  const fpsRef = useRef(60);
 
   const [isCityEmpty, setIsCityEmpty] = useState(true);
   const wasEmptyRef = useRef(true);
   const [timePhaseName, setTimePhaseName] = useState("Malam");
+  const [walkerCount, setWalkerCount] = useState<number>(0);
 
   // Baca preferensi warna via useSyncExternalStore (client-side murni, bebas hydration mismatch)
   const selectedColorId = useSyncExternalStore(
@@ -62,6 +71,20 @@ export default function CityCanvas() {
   useEffect(() => {
     updateConfig({ letterColorId: selectedColorId });
   }, [selectedColorId]);
+
+  // Pantau preferensi reduced motion dari sistem operasi
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    reducedMotionRef.current = mq.matches;
+    const handler = (e: MediaQueryListEvent) => {
+      reducedMotionRef.current = e.matches;
+    };
+    mq.addEventListener?.("change", handler);
+    return () => {
+      mq.removeEventListener?.("change", handler);
+    };
+  }, []);
 
   const timeTransitionRef = useRef({
     fromPhase: 0,
@@ -119,6 +142,15 @@ export default function CityCanvas() {
       // Perbarui state kota di ref (tanpa re-render React)
       const nextState = cityReducer(cityStateRef.current, action);
       cityStateRef.current = nextState;
+
+      // Tangani aksi RESET: buat semua walker exit cepat (300 ms)
+      if (action.type === "RESET") {
+        for (const w of walkersRef.current) {
+          w.state = "exit";
+          w.stateTimer = 0.3;
+          w.exitDuration = 0.3;
+        }
+      }
 
       // Tangani transisi waktu saat aksi ENTER
       if (action.type === "ENTER") {
@@ -278,6 +310,30 @@ export default function CityCanvas() {
       const initialX = Math.round(worldScreenWidth * 0.15);
       updateCity(cityStateRef.current, dt, initialX);
 
+      // 2b. Update kelompok gedung dan karakter berjalan (Walkers FR-16)
+      const groups = computeGroups(cityStateRef.current.items);
+      groupsRef.current = groups;
+      walkersRef.current = updateWalkers(
+        walkersRef.current,
+        groups,
+        dt,
+        cityStateRef.current.seed,
+        reducedMotionRef.current
+      );
+
+      // Hitung FPS untuk debug monitor
+      frameCountRef.current++;
+      const nowTime = performance.now();
+      if (lastFpsTimeRef.current === 0) {
+        lastFpsTimeRef.current = nowTime;
+      } else if (nowTime - lastFpsTimeRef.current >= 500) {
+        fpsRef.current = Math.round(
+          (frameCountRef.current * 1000) / (nowTime - lastFpsTimeRef.current)
+        );
+        frameCountRef.current = 0;
+        lastFpsTimeRef.current = nowTime;
+      }
+
       // Periksa apakah kota kosong untuk menampilkan kembali HintOverlay
       const empty = cityStateRef.current.items.length === 0;
       if (empty !== wasEmptyRef.current) {
@@ -334,12 +390,15 @@ export default function CityCanvas() {
           visibleBuildings,
           time: currentTime,
           palette: currentPalette,
+          walkers: walkersRef.current,
+          groups: groupsRef.current,
         });
 
         // Debug info update
         if (isDebug && Math.floor(currentTime) % 10 === 0) {
+          setWalkerCount(walkersRef.current.length);
           setCameraDebugInfo(
-            `Cam: ${Math.round(cameraX)} | Skala: ${worldScale.toFixed(2)} | Vis: ${visibleBuildings.length}/${allBuildings.length} | Waktu: ${currentPalette.phaseName}`
+            `FPS: ${fpsRef.current} | Cam: ${Math.round(cameraX)} | Skala: ${worldScale.toFixed(2)} | Vis: ${visibleBuildings.length}/${allBuildings.length} | Walkers: ${walkersRef.current.length} (${groups.length} grp) | Waktu: ${currentPalette.phaseName}`
           );
         }
       }
@@ -388,7 +447,7 @@ export default function CityCanvas() {
             Input: type={inputDebug.inputType} | comp={String(inputDebug.isComposing)} | data=&quot;{inputDebug.data}&quot; | len={inputDebug.valueLength}
           </div>
           <div>Fokus: {focusDebugInfo}</div>
-          <div>Gedung: {buildingCount}</div>
+          <div>Gedung: {buildingCount} | Walkers: {walkerCount}</div>
           <div>{cameraDebugInfo || "Memuat info kamera..."}</div>
           <div>
             ActiveElement:{" "}

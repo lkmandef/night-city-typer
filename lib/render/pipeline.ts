@@ -1,9 +1,12 @@
 import type { Building, Separator } from "@/lib/city/types";
+import type { BuildingGroup } from "@/lib/city/groups";
+import type { Walker } from "@/lib/city/walkers";
 import { drawGround, drawMoon, drawSky, type TimePalette } from "./sky";
 import { drawStars, type Star } from "./stars";
 import { type ParallaxRenderer } from "./parallax";
 import { drawSeparators } from "./separators";
 import { drawBuildings } from "./drawBuilding";
+import { drawWalkers } from "./walkers";
 
 export interface RenderPipelineOptions {
   ctx: CanvasRenderingContext2D;
@@ -18,6 +21,8 @@ export interface RenderPipelineOptions {
   visibleBuildings: Building[];
   time: number;
   palette?: TimePalette;
+  walkers?: Walker[];
+  groups?: BuildingGroup[];
 }
 
 /**
@@ -96,6 +101,18 @@ export function renderScene(options: RenderPipelineOptions): void {
 
   drawSeparators(ctx, visibleSeparators, groundY, time);
   drawBuildings(ctx, visibleBuildings, groundY, time, palette?.windowLitFactor ?? 1.0);
+  if (options.walkers && options.groups) {
+    const worldScreenWidth = width / worldScale;
+    drawWalkers(
+      ctx,
+      options.walkers,
+      options.groups,
+      groundY,
+      worldScale,
+      cameraX,
+      worldScreenWidth
+    );
+  }
   drawFireflies(ctx, visibleSeparators, groundY, time);
 
   ctx.restore();

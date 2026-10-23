@@ -42,7 +42,34 @@ export interface CityConfig {
   RIVER_PARK_MAX_WIDTH: number; // Lebar maksimum sungai dan taman (110 px)
   ROAD_MIN_WIDTH: number; // Lebar minimum jalan (65 px)
   ROAD_MAX_WIDTH: number; // Lebar maksimum jalan (95 px)
+
+  // Karakter Berjalan (Walkers FR-16)
+  WALKER_MIN_GROUP: number;
+  WALKER_MAX_GROUP: number;
+  WALKER_CHUNK: number;
+  WALKER_HUMAN_SPEED_MIN: number;
+  WALKER_HUMAN_SPEED_MAX: number;
+  WALKER_CAT_SPEED_MIN: number;
+  WALKER_CAT_SPEED_MAX: number;
+  WALKER_LANE_OFFSET: number;
+  WALKER_LANE_VARIATION: number;
+  WALKER_SPRITE_PX: number;
+  WALKER_CAT_SIT_CHANCE: number;
+  WALKER_BOUNDS_MARGIN: number;
 }
+
+export const WALKER_MIN_GROUP = 4;
+export const WALKER_MAX_GROUP = 7;
+export const WALKER_CHUNK = 5;
+export const WALKER_HUMAN_SPEED_MIN = 14;
+export const WALKER_HUMAN_SPEED_MAX = 20;
+export const WALKER_CAT_SPEED_MIN = 18;
+export const WALKER_CAT_SPEED_MAX = 26;
+export const WALKER_LANE_OFFSET = 14;
+export const WALKER_LANE_VARIATION = 4;
+export const WALKER_SPRITE_PX = 2.5;
+export const WALKER_CAT_SIT_CHANCE = 0.25;
+export const WALKER_BOUNDS_MARGIN = 6;
 
 export const defaultConfig: Readonly<CityConfig> = {
   CELL: 11,
@@ -78,6 +105,19 @@ export const defaultConfig: Readonly<CityConfig> = {
   RIVER_PARK_MAX_WIDTH: 110,
   ROAD_MIN_WIDTH: 65,
   ROAD_MAX_WIDTH: 95,
+
+  WALKER_MIN_GROUP,
+  WALKER_MAX_GROUP,
+  WALKER_CHUNK,
+  WALKER_HUMAN_SPEED_MIN,
+  WALKER_HUMAN_SPEED_MAX,
+  WALKER_CAT_SPEED_MIN,
+  WALKER_CAT_SPEED_MAX,
+  WALKER_LANE_OFFSET,
+  WALKER_LANE_VARIATION,
+  WALKER_SPRITE_PX,
+  WALKER_CAT_SIT_CHANCE,
+  WALKER_BOUNDS_MARGIN,
 };
 
 // Singleton runtime config yang dapat dimodifikasi saat live preview (?tune=1)

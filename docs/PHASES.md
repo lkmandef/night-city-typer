@@ -35,6 +35,18 @@ Dokumen pelacakan status dan detail per fase implementasi Night City Typer.
 
 ---
 
+## Catatan Fitur Khusus: Karakter Berjalan di Depan Gedung (FR-16)
+
+- **Prioritas:** Should (Functional Requirement FR-16).
+- **Konsep:** Setiap kelompok 4 sampai 7 gedung bersebelahan memiliki satu karakter (manusia atau kucing) yang berjalan bolak-balik di tanah di depannya dan tidak keluar dari rentang kelompok itu.
+- **Teknis:**
+  - `computeGroups(items)` di `lib/city/groups.ts`: mengelompokkan rangkaian gedung tanpa pemisah (panjang 4-7 jadi 1 kelompok, >7 dipecah per 5 dengan sisa <4 digabung).
+  - `updateWalkers(walkers, groups, dt, worldSeed, reducedMotion)` di `lib/city/walkers.ts`: spawn 50% kucing, 50% manusia; mesin keadaan (enter, walk, pause, sit, exit); batasan bounds `[minX, maxX]`; adaptif saat kelompok bertambah/menyusut/runtuh.
+  - Sprite pixel-art di `lib/render/sprites.ts`: manusia (~5x9 px) dan kucing (~9x6 px) dirender ke offscreen canvas dan dicerminkan horizontal untuk arah gerak.
+  - Render di `lib/render/walkers.ts`: di area tanah (di bawah baseline), elips bayangan kaki, dan gradien tipis cahaya jendela podium.
+
+---
+
 ## Catatan Fitur Khusus: Pemilih Warna Huruf (FR-17)
 
 - **Prioritas:** Should (Functional Requirement FR-17).
